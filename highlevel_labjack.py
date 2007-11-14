@@ -86,7 +86,14 @@ class UE9:
 		else:
 			return time() * 1000
 	
-	def getCalibrationInfo(self, caliInfo):
+	def getCalibrationInfo(self, caliInfo = True):
+		if caliInfo is True:
+			if self.caliInfo is None:
+				self.caliInfo = CalibrationInfo()
+			caliInfo = self.caliInfo
+		if caliInfo is None:
+			caliInfo = CalibrationInfo()
+		
 		sendBuffer = [0] *   8
 		recBuffers = []
 		sentRec = 0
@@ -427,7 +434,7 @@ class UE9:
 		LabJackPython.LJ_rgUNIP625V: 3,
 	}
 	
-	def eAIN(self, caliInfo, ChannelP, ChannelN, Range, Resolution, Settling, Binary):
+	def eAIN(self, ChannelP, ChannelN, Range, Resolution, Settling, Binary, caliInfo = self.caliInfo):
 		if not Range in self._RangeGainAssoc:
 			raise LabJackException(0, "eAIN error: Invalid Range")
 		ainGain = self._RangeGainAssoc[Range]
