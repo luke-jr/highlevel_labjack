@@ -434,7 +434,10 @@ class UE9:
 		LabJackPython.LJ_rgUNIP625V: 3,
 	}
 	
-	def eAIN(self, ChannelP, ChannelN, Range, Resolution, Settling, Binary, caliInfo = self.caliInfo):
+	def eAIN(self, ChannelP, ChannelN, Range, Resolution, Settling, Binary, caliInfo = True):
+		if caliInfo is True:
+			caliInfo = self.caliInfo
+		
 		if not Range in self._RangeGainAssoc:
 			raise LabJackException(0, "eAIN error: Invalid Range")
 		ainGain = self._RangeGainAssoc[Range]
