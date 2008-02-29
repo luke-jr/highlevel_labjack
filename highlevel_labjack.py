@@ -16,6 +16,13 @@ class UE9:
 	caliInfo = None
 	
 	def __init__(self, ConnectionType, Address, FirstFound = True):
+		self.reinit(ConnectionType, Address, FirstFound)
+	
+	def reinit(ConnectionType = self.ConnectionType, Address = self.Address, FirstFound = self.FirstFound):
+		self.ConnectionType = ConnectionType
+		self.Address = Address
+		self.FirstFound = FirstFound
+		
 		FF = 0
 		if FirstFound:
 			FF = 1
