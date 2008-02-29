@@ -600,7 +600,10 @@ class UE9:
 			recBuff[6], # outAINH
 		)
 	
-	def ehDIO_Feedback(self, channel, direction):
+	def ehDIO_Feedback(self, channel, newValue = None):
+		if channel > 22:
+			raise LabJackException(0, "DIO Feedback error: Invalid Channel")
+		
 		sendBuff = [0] * 34
 		recBuff  = [0] * 64
 		
@@ -608,45 +611,20 @@ class UE9:
 		sendBuff[2] = 0x0E  # number of data words
 		sendBuff[3] = 0x00  # extended command number
 		
-		tempDir = direction >= 1
-		tempState = False # TODO: this is the "current known value" in the C code; why?
+		tempOffset = 6 + ((channel / 8) * 3)
+		tempByte = pow(2, channel % 8)
+		sendBuff[tempOffset] = tempByte
+		rvidx = {
+			 6:  7,
+			 9:  9,
+			12: 10,
+			14: 11,
+		}[tempOffset]
 		
-		if False:
-			pass
-		elif channel <=  7:
-			tempByte = pow(2, channel)
-			sendBuff[6] = tempByte
-			if tempDir:
-				sendBuff[7] = tempByte
-			if tempState:
-				sendBuff[8] = tempByte
-			rvidx = 7
-		elif channel <= 15:
-			tempByte = pow(2, (channel -  8))
-			sendBuff[9] = tempByte
-			if tempDir:
-				sendBuff[10] = tempByte
-			if tempState:
-				sendBuff[11] = tempByte
-			rvidx = 9
-		elif channel <= 19:
-			tempByte = pow(2, (channel - 16))
-			sendBuff[12] = tempByte
-			if tempDir:
-				sendBuff[13] = tempByte * 16
-			if tempState:
-				sendBuff[13] = tempByte
-			rvidx = 10
-		elif channel <= 22:
-			tempByte = pow(2, (channel - 20))
-			sendBuff[14] = tempByte
-			if tempDir:
-				sendBuff[15] = tempByte * 16
-			if tempState:
-				sendBuff[15] = tempByte
-			rvidx = 11
-		else:
-			raise LabJackException(0, "DIO Feedback error: Invalid Channel")
+		if not newValue is None:
+			sendBuff[tempOffset + 1] = tempByte
+			if newValue:
+				sendBuff[tempOffset + 2] = tempByte
 		
 		self.extendedChecksum(sendBuff)
 		
