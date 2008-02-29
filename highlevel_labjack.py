@@ -18,7 +18,11 @@ class UE9:
 	def __init__(self, ConnectionType, Address, FirstFound = True):
 		self.reinit(ConnectionType, Address, FirstFound)
 	
-	def reinit(ConnectionType = self.ConnectionType, Address = self.Address, FirstFound = self.FirstFound):
+	def reinit(self, ConnectionType = None, Address = None, FirstFound = None):
+		if ConnectionType is None: ConnectionType = self.ConnectionType
+		if Address        is None: Address        = self.Address
+		if FirstFound     is None: FirstFound     = self.FirstFound
+		
 		self.ConnectionType = ConnectionType
 		self.Address = Address
 		self.FirstFound = FirstFound
