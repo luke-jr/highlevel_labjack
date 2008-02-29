@@ -503,15 +503,9 @@ class UE9:
 		)
 	
 	def eDI(self, Channel):
-		if Channel > 22:
-			raise LabJackException("eDI error: Invalid Channel")
-		
 		return self.ehDIO_Feedback(Channel)
 	
 	def eDO(self, Channel, State):
-		if Channel > 22:
-			raise LabJackException("Error: Invalid Channel")
-		
 		return self.ehDIO_Feedback(Channel, State)
 	
 	def eTCConfig(self, aEnableTimers, aEnableCounters, TCPinOffset, TimerClockBaseIndex, TimerClockDivisor, aTimerModes, aTimerValues):
@@ -601,7 +595,7 @@ class UE9:
 		)
 	
 	def ehDIO_Feedback(self, channel, newValue = None):
-		if channel > 22:
+		if channel < 0 or channel > 22:
 			raise LabJackException(0, "DIO Feedback error: Invalid Channel")
 		
 		sendBuff = [0] * 34
