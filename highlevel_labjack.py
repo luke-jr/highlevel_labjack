@@ -24,13 +24,13 @@ class UE9:
 		self._LJ  = self._LJP.OpenLabJack(LabJackPython.LJ_dtUE9, ConnectionType, Address, FF)
 	
 	def normalChecksum(self, b):
-		b[0] = normalChecksum8(b)
+		b[0] = self.normalChecksum8(b)
 	
 	def extendedChecksum(self, b):
-		a = extendedChecksum16(b)
-		b[4] = a & 0xff
+		a = self.extendedChecksum16(b)
+		b[4] = a & 0xff;
 		b[5] = (a / 256) & 0xff
-		b[0] = extendedChecksum8(b)
+		b[0] = self.extendedChecksum8(b)
 	
 	def normalChecksum8(self, b):
 		# Sums bytes 1 to n-1 unsigned to a 2 byte value. Sums quotient and
@@ -49,7 +49,7 @@ class UE9:
 	def extendedChecksum16(self, b):
 		# Sums bytes 6 to n-1 to a unsigned 2 byte value
 		a = 0
-		for c in b:
+		for c in b[6:]:
 			a += c
 		
 		return a
@@ -58,8 +58,8 @@ class UE9:
 		# Sums bytes 1 to 5. Sums quotient and remainder of 256 division.
 		# Again, sums quotient and remainder of 256 division.
 		a = 0
-		for i in c[0:8]:
-			a += c
+		for i in b[1:6]:
+			a += i
 		
 		bb = a / 256
 		a = (a - 256 * bb) + bb
@@ -600,7 +600,7 @@ class UE9:
 			recBuff[6], # outAINH
 		)
 	
-	def ehDIO_Feedback(self, channel, direction, state):
+	def ehDIO_Feedback(self, channel, direction):
 		sendBuff = [0] * 34
 		recBuff  = [0] * 64
 		
@@ -609,7 +609,7 @@ class UE9:
 		sendBuff[3] = 0x00  # extended command number
 		
 		tempDir = direction >= 1
-		tempState = state >= 1
+		tempState = False # TODO: this is the "current known value" in the C code; why?
 		
 		if False:
 			pass
@@ -667,7 +667,7 @@ class UE9:
 		if checksumTotal & 0xff != recBuff[4]:
 			raise LabJackException(0, "DIO Feedback error : read buffer has bad checksum16(LBS)")
 		
-		if extendedChecksum8(recBuff) != recBuff[0]:
+		if self.extendedChecksum8(recBuff) != recBuff[0]:
 			raise LabJackException(0, "DIO Feedback error : read buffer has bad checksum8")
 		
 		if recBuff[1] != 0xF8 or recBuff[2] != 0x1D or recBuff[3] != 0x00:
@@ -708,7 +708,7 @@ class UE9:
 		if recChars < 40:
 			raise LabJackException(0, "ehTimerCounter error : did not read all of the buffer")
 		
-		checksumTotal = extendedChecksum16(recBuff)
+		checksumTotal = self.extendedChecksum16(recBuff)
 		if (checksumTotal / 256) & 0xff != recBuff[5]:
 			raise LabJackException(0, "ehTimerCounter error : read buffer has bad checksum16(MSB)")
 		
