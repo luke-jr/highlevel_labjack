@@ -901,6 +901,105 @@ class U3(UE9):
 	
 	def binaryToUncalibratedAnalogTemperature(self, bytesTemperature):
 		return bytesTemperature * 0.013021
+	
+	#TODO: new output DAC1Enable
+	# NOTE: moved ConfigIO param to the end optional for UE9 compat
+	def eAIN(self, ChannelP, ChannelN, Range, Resolution, Settling, Binary, caliInfo = True, ConfigIO = False):
+		if caliInfo is True:
+			caliInfo = self.caliInfo
+		
+		isCalibrationInfoValid(caliInfo)
+		
+		hwver = caliInfo.hardwareVersion
+		hv = caliInfo.highVoltage
+		
+		if ChannelP < 0 || (ChannelP > 15 && ChannelP != 30 && ChannelP != 31):
+			raise LabJackException(0, "eAIN error: Invalid positive channel")
+		
+		if ChannelN < 0 || (ChannelN > 15 && ChannelN != 30 && ChannelN != 31) || (hwver >= 1.3 && hv == 1 && ((ChannelP < 4 && ChannelN != 31) || ChannelN < 4)):
+			raise LabJackException(0, "eAIN error: Invalid negative channel")
+		
+		if hwver >= 1.3 && hv == 1 && ChannelP < 4:
+			pass
+		elif ConfigIO:
+			FIOAnalog = 0
+			EIOAnalog = 0
+			
+			# Setting ChannelP and ChannelN channels to analog using
+			# FIOAnalog and EIOAnalog
+			if ChannelP <= 7:
+				FIOAnalog = pow(2, ChannelP)
+			elif ChannelP <= 15:
+				EIOAnalog = pow(2, (ChannelP - 8))
+			
+			if ChannelN <= 7:
+				FIOAnalog = FIOAnalog | pow(2, ChannelN)
+			elif ChannelN <= 15:
+				EIOAnalog = EIOAnalog | pow(2, (ChannelN - 8))
+			
+			# Using ConfigIO to get current FIOAnalog and EIOAnalog settings
+			(
+				curTCConfig,   # outTimerCounterConfig
+				outDAC1Enalbe, # outDAC1Enable
+				curFIOAnalog,  # outFIOAnalog
+				curEIOAnalog,  # outEIOAnalog
+			) = self.ehConfigIO(
+				0,             # inWriteMask
+				0,             # inTimerCounterConfig
+				0,             # inDAC1Enable
+				0,             # inFIOAnalog
+				0,             # inEIOAnalog
+			)
+			
+			DAC1Enable = outDAC1Enable
+			
+			if !(FIOAnalog == curFIOAnalog && EIOAnalog == curEIOAnalog):
+				# Creating new FIOAnalog and EIOAnalog settings
+				FIOAnalog = FIOAnalog | curFIOAnalog
+				EIOAnalog = EIOAnalog | curEIOAnalog
+				
+				# Using ConfigIO to set new FIOAnalog and EIOAnalog settings
+				(
+					__,           # outTimerCounterConfig
+					__,           # outDAC1Enable
+					curFIOAnalog, # outFIOAnalog
+					curEIOAnalog, # outEIOAnalog
+				) = ehConfigIO(
+					12,           # inWriteMask
+					curTCConfig,  # inTimerCounterConfig
+					0,            # inDAC1Enable
+					FIOAnalog,    # inFIOAnalog
+					EIOAnalog,    # inEIOAnalog
+				)
+		
+		# Setting up Feedback command to read analog input
+		sendDataBuff[0] = 1;    # IOType is AIN
+		
+		settling = (Settling != 0) ? 1 : 0
+		quicksample = (Resolution != 0) ? 1 : 0
+		sendDataBuff[1] = ChannelP + settling * 64 + quicksample * 128  # Positive channel (bits 0-4), LongSettling (bit 6)
+		                                                                # QuickSample (bit 7)
+		sendDataBuff[2] = ChannelN   # Negative channel
+		
+		(
+			recDataBuff,  # outDataBuff
+			__,           # outDataSize
+		) = self.ehFeedback(
+			sendDataBuff, # inIOTypesDataBuff
+			3,            # inIOTypesDataSize
+			2,            # outDataSize
+		)
+		
+		bytesVT = recDataBuff[0] + recDataBuff[1] * 256
+		
+		if Binary:
+			return bytesVT
+		
+		if ChannelP == 30:
+			return self.binaryToCalibratedAnalogTemperature(caliInfo, bytesVT)
+		if hwver < 1.3:
+			return self.binaryToCalibratedAnalogVoltage(CalibrationInfo, DAC1Enable, ChannelN, bytesVT)
+		return self.binaryToCalibratedAnalogVoltage(CalibrationInfo, ChannelP, ChannelN, bytesVT)
 
 class U3_HV(U3):
 	def binaryToCalibratedAnalogVoltage(self, caliInfo, positiveChannel, negChannel, bytesVoltage):
