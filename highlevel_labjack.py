@@ -648,15 +648,15 @@ class UE9(common):
 		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
 		if recChars < recSize:
 			if recChars == 0:
-				raise Exception(0, "Read failed");
+				raise LabJackException(0, "Read failed");
 			else:
-				raise Exception(0, "Only read %d of %d bytes" % (recChars, recSize))
+				raise LabJackException(0, "Only read %d of %d bytes" % (recChars, recSize))
 		chksum = recBuff[0]
 		self._LJP.SetChecksum8(recBuff, recSize)
 		if chksum != recBuff[0]:
-			raise Exception(0, "Read buffer has bad checksum")
+			raise LabJackException(0, "Read buffer has bad checksum")
 		if recBuff[1] != 0xA3:
-			raise Exception(0, "Read buffer has wrong command byte")
+			raise LabJackException(0, "Read buffer has wrong command byte")
 		
 		return (
 			recBuff[2], # outIOType
@@ -975,6 +975,7 @@ class U3(_common):
 				)
 		
 		# Setting up Feedback command to read analog input
+		sendDataBuff = [0] * 3
 		sendDataBuff[0] = 1;    # IOType is AIN
 		
 		settling = (Settling != 0) ? 1 : 0
@@ -985,7 +986,6 @@ class U3(_common):
 		
 		recDataBuff = self.ehFeedback(
 			sendDataBuff, # inIOTypesDataBuff
-			3,            # inIOTypesDataSize
 			2,            # outDataSize
 		)
 		
@@ -1023,13 +1023,13 @@ class U3(_common):
 		
 		# Setting up Feedback command to set DAC
 		if caliInfo.hardwareVersion < 1.3:
-			sendSize = 2
+			sendDataBuff = [0] * 2
 			
 			sendDataBuff[0] = 34 + Channel  # IOType is DAC0/1 (8 bit)
 			
 			sendDataBuff[1] = self.analogToCalibratedBinary8BitVoltage(caliInfo, Channel, Voltage) # Value
 		else:
-			sendSize = 3
+			sendDataBuff = [0] * 3
 			
 			sendDataBuff[0] = 38 + Channel  # IOType is DAC0/1 (16 bit)
 			
@@ -1040,7 +1040,6 @@ class U3(_common):
 		
 		self.ehFeedback(
 			sendDataBuff, # inIOTypesDataBuff
-			sendSize,     # inIOTypesDataSize
 			0,            # outDataSize
 		)
 	
@@ -1049,10 +1048,6 @@ class U3(_common):
 			raise LabJackException(0, "DIO Feedback error: Invalid Channel")
 		
 		sendBuff = [0] * 4
-		if newValue is None:
-			recBuff = [0]
-		else:
-			recBuff = []
 		
 		if ConfigIO and Channel <= 15:
 			FIOAnalog = 255
@@ -1111,14 +1106,13 @@ class U3(_common):
 			if newValue:
 				sendBuff[3]+= 128 # + State (bit 7)
 		
-		recData = self.ehFeedback(
-			sendData,     # inIOTypesDataBuff
-			4,            # inIOTypesDataSize
-			len(recData), # outDataSize
+		recBuff = self.ehFeedback(
+			sendBuff,                    # inIOTypesDataBuff
+			(newValue is None) ? 1 : 0,  # outDataSize
 		)
 		
 		if newValue is None:
-			return recData[0]
+			return recBuff[0]
 		return newValue
 	
 	def eTCConfig(self, aEnableTimers, aEnableCounters, TCPinOffset, TimerClockBaseIndex, TimerClockDivisor, aTimerModes, aTimerValues):
@@ -1195,7 +1189,7 @@ class U3(_common):
 		
 		if numTimers > 0:
 			# Feedback
-			sendBuff = [0] * 8
+			sendBuff = [0] * 4 * numTimers
 			
 			for i in range(numTimers):
 				sendBuff[    i * 4] = 43 + i * 2                        # TimerConfig
@@ -1203,11 +1197,8 @@ class U3(_common):
 				sendBuff[2 + i * 4] =  aTimerValues[i] & 0x00ff         # Value LSB
 				sendBuff[3 + i * 4] = (aTimerValues[i] & 0xff00) / 256  # Value MSB
 			
-			sendBuffSize = 4 * numTimers
-			
 			self.ehFeedback(
 				sendBuff,     # inIOTypesDataBuff
-				sendBuffSize, # inIOTypesDataSize
 				0,            # outDataSize
 			)
 	
@@ -1239,9 +1230,10 @@ class U3(_common):
 				sendBuffSize += 2
 				recBuffSize  += 4
 		
+		sendBuff = sendBuff[0:sendBuffSize]
+		
 		recBuff = self.ehFeedback(
 			sendBuff,     # inIOTypesDataBuff
-			sendBuffSize, # inIOTypesDataSize
 			recBuffSize,  # outDataSize
 		)
 		
@@ -1285,18 +1277,18 @@ class U3(_common):
 		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
 		if recChars < recSize:
 			if recChars == 0:
-				raise Exception(0, "Read failed");
+				raise LabJackException(0, "Read failed");
 			else:
-				raise Exception(0, "Only read %d of %d bytes" % (recChars, recSize))
+				raise LabJackException(0, "Only read %d of %d bytes" % (recChars, recSize))
 		
 		chksum = (recBuff[0], recBuff[4], recBuff[5])
 		self.extendedChecksum(recBuff)
 		if chksum != (recBuff[0], recBuff[4], recBuff[5]):
-			raise Exception(0, "Read buffer has bad checksum")
+			raise LabJackException(0, "Read buffer has bad checksum")
 		if recBuff[1] != 0xF8 or recBuff[2] != 3 or recBuff[3] != 0x0B:
-			raise Exception(0, "Read buffer has wrong command bytes")
+			raise LabJackException(0, "Read buffer has wrong command bytes")
 		if recBuff[6]:
-			raise Exception(0, "Read buffer received errorcode %d" % recBuff[6])
+			raise LabJackException(0, "Read buffer received errorcode %d" % recBuff[6])
 		
 		return (
 			recBuff[8],  # outTimerCounterConfig
@@ -1331,16 +1323,69 @@ class U3(_common):
 		chksum = (recBuff[0], recBuff[4], recBuff[5])
 		self.extendedChecksum(recBuff)
 		if chksum != (recBuff[0], recBuff[4], recBuff[5]):
-			raise Exception(0, "Read buffer has bad checksum")
+			raise LabJackException(0, "Read buffer has bad checksum")
 		if recBuff[1] != 0xF8 or recBuff[2] != 2 or recBuff[3] != 0x0A:
-			raise Exception(0, "Read buffer has wrong command bytes")
+			raise LabJackException(0, "Read buffer has wrong command bytes")
 		if recBuff[6]:
-			raise Exception(0, "Read buffer received errorcode %d" % recBuff[6])
+			raise LabJackException(0, "Read buffer received errorcode %d" % recBuff[6])
 		
 		return (
 			recBuff[8],  # outTimerClockConfig
 			recBuff[9],  # outTimerClockDivisor
 		)
+	
+	def ehFeedback(self, inIOTypesDataBuff, outDataSize)
+		ret = 0
+		commandBytes = 6
+		
+		if (sendDWSize = len(inIOTypesDataBuff) + 1) % 2:
+			++sendDWSize
+		if ( recDWSize =           outDataSize  + 3) % 2:
+			++ recDWSize
+		
+		sendBuff = [0] * (sendSize = commandBytes + sendDWSize)
+		recBuff  = [0] * ( recSize = commandBytes +  recDWSize)
+		
+		# Setting up Feedback command
+		sendBuff[1] = 0xF8             # Command byte
+		sendBuff[2] = sendDWSize / 2   # Number of data words (.5 word for echo, 1.5
+		                               # words for IOTypes)
+		
+		# TODO: optimize this with []+[]
+		for i in range(inIOTypesDataSize):
+			sendBuff[i + commandBytes + 1] = inIOTypesDataBuff[i]
+		
+		self.extendedChecksum(sendBuff)
+		
+		# Sending command to U3
+		self._LJP.Write(self._LJ, sendBuff, sendSize)
+		
+		# Reading response from U3
+		(recChars, recBuff) = self._LJP.Read(self._LJ, recSize);
+		if recChars < recSize:
+			if recChars == 0:
+				raise LabJackException(0, "ehFeedback : read failed")
+			elif recChars < 8:
+				raise LabJackException(0, "ehFeedback : response buffer is too small")
+			else:
+				raise LabJackException(0, "ehFeedback : did not read all of the buffer")
+		
+		chksum = (recBuff[0], recBuff[4], recBuff[5])
+		self.extendedChecksum(recBuff)
+		if chksum != (recBuff[0], recBuff[4], recBuff[5]):
+			raise LabJackException(0, "Read buffer has bad checksum")
+		if recBuff[1] != 0xF8 or recBuff[3] != 0:
+			raise LabJackException(0, "Read buffer has wrong command bytes")
+		if recBuff[6]:
+			raise LabJackException(0, "Read buffer received errorcode %d (frame: %d)" % (recBuff[6], recBuff[7]))
+		
+		outDataBuff = [0] * outDataSize
+		for i in range(outDataSize):
+			if not i + commandBytes + 3 < recChars:
+				 break
+			outDataBuff[i] = recBuff[i + commandBytes + 3];
+		
+		return outDataBuff
 
 class U3_HV(U3):
 	def binaryToCalibratedAnalogVoltage(self, caliInfo, positiveChannel, negChannel, bytesVoltage):
