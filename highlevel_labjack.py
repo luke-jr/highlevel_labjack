@@ -260,8 +260,11 @@ class UE9:
 		# value not between 0 and 4095.
 		if tempBytesVoltage < 0:
 			tempBytesVoltage = 0
-		if tempBytesVoltage > 4095:
+		# HACKY:
+		if tempBytesVoltage > 4095 and caliInfo.hardwareVersion is None:
 			tempBytesVoltage = 4095
+		if tempBytesVoltage > 255 and caliInfo.hardwareVersion < 1.3:
+			tempBytesVoltage = 255
 		
 		return tempBytesVoltage
 	
@@ -808,8 +811,7 @@ class U3(UE9):
 		
 		return caliInfo
 	
-	# NOTE: order of negChannel and dacEnabled reversed to match UE9 to some extent
-	def binaryToCalibratedAnalogVoltage(self, caliInfo, negChannel, dacEnabled, bytesVoltage):
+	def binaryToCalibratedAnalogVoltage(self, caliInfo, dacEnabled, negChannel, bytesVoltage):
 		self.isCalibrationInfoValid(caliInfo)
 		
 		analogVoltage = None
@@ -829,6 +831,62 @@ class U3(UE9):
 				analogVoltage = caliInfo.ainSESlope * bytesVoltage + caliInfo.ainSEOffset
 			else:
 				analogVoltage = (bytesVoltage / 65536.) * caliInfo.vreg
+		else:
+			raise LabJackException(0, "binaryToCalibratedAnalogVoltage error: invalid negative channel.")
+		
+		return analogVoltage
+	
+	def analogToCalibratedBinary8BitVoltage(self, caliInfo, DACNumber, analogVoltage, safetyRange = True):
+		return self.analogToCalibratedBinaryVoltage(caliInfo, DACNumber, analogVoltage, safetyRange)
+	
+	def analogToCalibratedBinary16BitVoltage(self, caliInfo, DACNumber, analogVoltage, safetyRange = True):
+		self.isCalibrationInfoValid(caliInfo)
+		
+		if DACNumber < 0 or DACNumber > 1:
+			raise LabJackException(0, "analogToCalibratedBinaryVoltage error: invalid DACNumber.")
+		slope  = caliInfo.DACSlope [DACNumber]
+		offset = caliInfo.DACOffset[DACNumber]
+		
+		if caliInfo.hardwareVersion >= 1.3:
+			slope *= 256
+			offset *= 256
+		
+		tempBytesVoltage = slope * analogVoltage + offset
+		
+		if not safetyRange:
+			return tempBytesVoltage
+		
+		# Checking to make sure bytesVoltage will be a value between 0 and 255/65535.  Too
+		# high of an analogVoltage (about 4.95 and above volts) or too low (below 0
+		# volts) will cause a value not between 0 and 255/65535.
+		if tempBytesVoltage < 0:
+			tempBytesVoltage = 0
+		if tempBytesVoltage > 65535 and caliInfo.hardwareVersion >= 1.30:
+			tempBytesVoltage = 65535
+		elif tempBytesVoltage > 255 and caliInfo.hardwareVersion <  1.30:
+			tempBytesVoltage = 255
+		
+		return tempBytesVoltage
+
+class U3_HV(U3):
+	def binaryToCalibratedAnalogVoltage(self, caliInfo, positiveChannel, negChannel, bytesVoltage):
+		self.isCalibrationInfoValid(caliInfo)
+		
+		if caliInfo.hardwareVersion < 1.3:
+			raise LabJackException(0, "binaryToCalibratedAnalogVoltage error: cannot handle U3 hardware versions < 1.30 .  Please use U3 class.")
+		
+		analogVoltage = None
+		
+		if (negChannel >= 0 && negChannel <= 15) || negChannel == 30:
+			if caliInfo.highVoltage == 0 || (caliInfo.highVoltage == 1 && positiveChannel >= 4 && negChannel >= 4):
+				analogVoltage = caliInfo.ainDiffSlope * bytesVoltage + caliInfo.ainDiffOffset
+			elif caliInfo.hardwareVersion >= 1.3 && caliInfo.highVoltage == 1:
+				raise LabJackException(0, "binaryToCalibratedAnalogVoltage error: invalid negative channel for U3-HV.")
+		elif negChannel == 31:
+			if caliInfo->highVoltage == 1 && positiveChannel >= 0 && positiveChannel < 4:
+				analogVoltage = caliInfo.hvAINSlope[positiveChannel] * bytesVoltage + caliInfo.hvAINOffset[positiveChannel]
+			else:
+				analogVoltage = caliInfo.ainSESlope * bytesVoltage + caliInfo.ainSEOffset;
 		else:
 			raise LabJackException(0, "binaryToCalibratedAnalogVoltage error: invalid negative channel.")
 		
