@@ -1210,6 +1210,55 @@ class U3(_common):
 				sendBuffSize, # inIOTypesDataSize
 				0,            # outDataSize
 			)
+	
+	def eTCValues(self, aReadTimers, aUpdateResetTimers, aReadCounters, aResetCounters):
+		sendBuff = [0] * 12
+		recBuff  = [0] * 16
+		
+		# Feedback
+		numTimers = 0
+		dataCountCounter = 0
+		dataCountTimer = 0
+		sendBuffSize = 0
+		recBuffSize = 0
+		
+		for i in range(2):
+			if aReadTimers[i] || aUpdateResetTimers[i]:
+				sendBuff[    sendDataBuffSize] = 42 + i * 2                        # Timer
+				sendBuff[1 + sendDataBuffSize] = aUpdateResetTimers[i] ? 1 : 0     # UpdateReset
+				sendBuff[2 + sendDataBuffSize] =  aTimerValues[i] & 0x00ff         # Value LSB
+				sendBuff[3 + sendDataBuffSize] = (aTimerValues[i] & 0xff00) / 256  # Value MSB
+				sendBuffSize += 4
+				recBuffSize  += 4
+				++numTimers
+		
+		for i in range(2):
+			if aReadCounters[i] || aResetCounters[i]:
+				sendBuff[    sendDataBuffSize] = 54 + i                     # Counter
+				sendBuff[1 + sendDataBuffSize] = aResetCounters[i] ? 1 : 0  # Reset
+				sendBuffSize += 2
+				recBuffSize  += 4
+		
+		recBuff = self.ehFeedback(
+			sendBuff,     # inIOTypesDataBuff
+			sendBuffSize, # inIOTypesDataSize
+			recBuffSize,  # outDataSize
+		)
+		
+		for i in range(2):
+			aTimerValues[i] = 0
+			if aReadTimers[i]:
+				for j in range(4):
+					aTimerValues[i] += recDataBuff[j + dataCountTimer * 4] * pow(2, 8 * j)
+			if aReadTimers[i] || aUpdateResetTimers[i]:
+				++dataCountTimer
+			
+			aCounterValues[i] = 0
+			if aReadCounters[i]:
+				for j in range(4):
+					aCounterValues[i] += recDataBuff[j + numTimers * 4 + dataCountCounter * 4] * pow(2, 8 * j)
+			if aReadCounters[i] || aResetCounters[i]:
+				++dataCountCounter
 
 class U3_HV(U3):
 	def binaryToCalibratedAnalogVoltage(self, caliInfo, positiveChannel, negChannel, bytesVoltage):
