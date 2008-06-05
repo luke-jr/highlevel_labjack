@@ -13,6 +13,7 @@ class CalibrationInfo:
 		self.DACOffset      = [0,0]
 
 class UE9:
+	prodID = 9
 	caliInfo = None
 	
 	def __init__(self, ConnectionType, Address, FirstFound = True):
@@ -128,7 +129,7 @@ class UE9:
 				raise LabJackException(0, "getCalibrationInfo recv did not receive all of the buffer")
 			
 			if recBuffer[1] != 0xF8 or recBuffer[2] != 0x41 or recBuffer[3] != 0x2A:
-				raise LabJackException(0, "received buffer at byte 1, 2, or 3 are not 0xA3, 0x01, 0x2A")
+				raise LabJackException(0, "getCalibrationInfo received wrong command bytes for ReadMem")
 			
 			recBuffers.append(recBuffer)
 		
@@ -159,7 +160,7 @@ class UE9:
 		
 		caliInfo.hiResBipolarSlope   = self.FPuint8ArrayToFPDouble(recBuffers[4],  8)
 		caliInfo.hiResBipolarOffset  = self.FPuint8ArrayToFPDouble(recBuffers[4], 16)
-		caliInfo.prodID = 9
+		caliInfo.prodID = self.prodID
 		
 		return caliInfo
 	
@@ -189,7 +190,7 @@ class UE9:
 		caliInfo.DACOffsetA = self.FPuint8ArrayToFPDouble(bytesResponse,  8)
 		caliInfo.DACSlopeB  = self.FPuint8ArrayToFPDouble(bytesResponse, 16)
 		caliInfo.DACOffsetB = self.FPuint8ArrayToFPDouble(bytesResponse, 24)
-		caliInfo.prodID = 9
+		caliInfo.prodID = self.prodID
 		
 		return err
 	
@@ -207,7 +208,7 @@ class UE9:
 		return resultWh + resultDec / 4294967296.0;
 	
 	def isCalibrationInfoValid(self, caliInfo):
-		if caliInfo is None or caliInfo.prodID != 9:
+		if caliInfo is None or caliInfo.prodID != self.prodID:
 			raise LabJackException(0, "Invalid calibration info.")
 		return True
 	
@@ -720,6 +721,92 @@ class UE9:
 			raise LabJackException(recBuff[6], "ehTimerCounter returns error %d" % recBuff[6])
 		
 		return (outTimer, outCounter)
+
+class U3(UE9):
+	prodID = 3
+	
+	def getCalibrationInfo(self, caliInfo = True):
+		if caliInfo is True:
+			if self.caliInfo is None:
+				self.caliInfo = CalibrationInfo()
+			caliInfo = self.caliInfo
+		if caliInfo is None:
+			caliInfo = CalibrationInfo()
+		
+		sendBuffer = [0] *   8
+		recBuffers = []
+		cU3SendBuffer = [0] * 26
+		cU3RecBuffer = [0] * 38
+		sentRec = 0
+		i = 0
+		
+		# sending ConfigU3 command to get hardware version and see if HV
+		cU3SendBuffer[1] = 0xF8  # command byte
+		cU3SendBuffer[2] = 0x0A  # number of data words
+		cU3SendBuffer[3] = 0x08  # extended command number
+		
+		extendedChecksum(cU3SendBuffer, 26)
+		
+		self._LJP.Write(self._LJ, U3_PIPE_EP1_OUT, sendBuffer, 26)
+		
+		(sentRec, cU3RecBuffer) = self._LJP.Read(self._LJ, False, 38)
+		if sentRec < 38:
+			raise LabJackException(0, "getCalibrationInfo recv did not receive all of the buffer")
+		
+		if cU3RecBuffer[1] != 0xF8 || cU3RecBuffer[2] != 0x10 || cU3RecBuffer[3] != 0x08:
+			raise LabJackException(0, "getCalibrationInfo received wrong command bytes for ConfigU3")
+		
+		caliInfo.hardwareVersion = cU3RecBuffer[14] + cU3RecBuffer[13] / 100.
+		caliInfo.highVoltage = (((cU3RecBuffer[37] & 18) == 18) ? 1 : 0)
+		
+		# initialize request
+		sendBuffer[1] = 0xF8  # command byte
+		sendBuffer[2] = 0x01  # number of data words
+		sendBuffer[3] = 0x2D  # extended command number
+		sendBuffer[6] = 0x00
+		
+		# reading blocks from memory
+		for idx in range(6):
+			sendBuffer[7] = idx
+			LabJackPython.SetChecksum(sendBuffer)
+			
+			self._LJP.Write(self._LJ, sendBuffer, 8)
+			
+			(sentRec, recBuffer) = self._LJP.Read(self._LJ, False, 40)
+			
+			if sentRec < 40:
+				raise LabJackException(0, "getCalibrationInfo recv did not receive all of the buffer")
+			
+			if recBuffer[1] != 0xF8 or recBuffer[2] != 0x11 or recBuffer[3] != 0x2D:
+				raise LabJackException(0, "getCalibrationInfo received wrong command bytes for ReadMem")
+			
+			recBuffers.append(recBuffer)
+		
+		# block data starts on byte 8 of the buffer
+		caliInfo.ainSESlope    = self.FPuint8ArrayToFPDouble(recBuffers[0],   0)
+		caliInfo.ainSEOffset   = self.FPuint8ArrayToFPDouble(recBuffers[0],   8)
+		caliInfo.ainDiffSlope  = self.FPuint8ArrayToFPDouble(recBuffers[0],  16)
+		caliInfo.ainDiffOffset = self.FPuint8ArrayToFPDouble(recBuffers[0],  24)
+		
+		caliInfo.DACSlope [0]  = self.FPuint8ArrayToFPDouble(recBuffers[1],   8)
+		caliInfo.DACOffset[0]  = self.FPuint8ArrayToFPDouble(recBuffers[1],  16)
+		caliInfo.DACSlope [1]  = self.FPuint8ArrayToFPDouble(recBuffers[1],  24)
+		caliInfo.DACOffset[1]  = self.FPuint8ArrayToFPDouble(recBuffers[1],  32)
+		
+		caliInfo.tempSlope     = self.FPuint8ArrayToFPDouble(recBuffers[2],   0)
+		caliInfo.Vref          = self.FPuint8ArrayToFPDouble(recBuffers[2],   8)
+		caliInfo.Vref15        = self.FPuint8ArrayToFPDouble(recBuffers[2],  16)
+		caliInfo.Vreg          = self.FPuint8ArrayToFPDouble(recBuffers[2],  24)
+		
+		for i in range(4):
+			caliInfo.hvAINSlope[i] = self.FPuint8ArrayToFPDouble(recBuffers[3],  i * 8)
+		
+		for i in range(4):
+			caliInfo.hvAINOffset[i] = self.FPuint8ArrayToFPDouble(recBuffers[4],  i * 8)
+		
+		caliInfo.prodID = self.prodID
+		
+		return caliInfo
 
 """
 x=UE9(LabJackPython.LJ_ctETHERNET, "192.168.1.209")
