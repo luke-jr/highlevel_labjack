@@ -1259,6 +1259,51 @@ class U3(_common):
 					aCounterValues[i] += recDataBuff[j + numTimers * 4 + dataCountCounter * 4] * pow(2, 8 * j)
 			if aReadCounters[i] || aResetCounters[i]:
 				++dataCountCounter
+	
+	def ehConfigIO(self, inWriteMask, inTimerCounterConfig, inDAC1Enable, inFIOAnalog, inEIOAnalog):
+		sendBuff = [0] * 12
+		recBuff  = [0[ * 12
+		
+		sendBuff[1] = 0xF8             # command byte
+		sendBuff[2] = 3                # Number of data words
+		sendBuff[3] = 0x0B             # Extended command number
+		
+		sendBuff[6] = inWriteMask      # Writemask
+		
+		sendBuff[7] = 0                # Reserved
+		sendBuff[8] = inTimerCounterConfig # TimerCounterConfig
+		sendBuff[9] = inDAC1Enable     # DAC1 enable : not enabling
+		sendBuff[10]= inFIOAnalog      # FIOAnalog
+		sendBuff[11]= inEIOAnalog      # EIOAnalog
+		self.extendedChecksum(sendBuff)
+		
+		# Sending command to U3
+		self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
+		
+		# Reading response from U3
+		recSize = 12
+		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+		if recChars < recSize:
+			if recChars == 0:
+				raise Exception(0, "Read failed");
+			else:
+				raise Exception(0, "Only read %d of %d bytes" % (recChars, recSize))
+		
+		chksum = (recBuff[0], recBuff[4], recBuff[5])
+		self.extendedChecksum(recBuff)
+		if chksum != (recBuff[0], recBuff[4], recBuff[5]):
+			raise Exception(0, "Read buffer has bad checksum")
+		if recBuff[1] != 0xF8 or recBuff[2] != 3 or recBuff[3] != 0x0B:
+			raise Exception(0, "Read buffer has wrong command bytes")
+		if recBuff[6]:
+			raise Exception(0, "Read buffer received errorcode %d" % recBuff[6])
+		
+		return (
+			recBuff[8],  # outTimerCounterConfig
+			recBuff[9],  # outDAC1Enable
+			recBuff[10], # outFIOAnalog
+			recBuff[11], # outEIOAnalog
+		)
 
 class U3_HV(U3):
 	def binaryToCalibratedAnalogVoltage(self, caliInfo, positiveChannel, negChannel, bytesVoltage):
