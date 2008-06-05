@@ -325,54 +325,6 @@ class _common:
 	def eDO(self, Channel, State):
 		return self.ehDIO_Feedback(Channel, State)
 	
-	def eTCConfig(self, aEnableTimers, aEnableCounters, TCPinOffset, TimerClockBaseIndex, TimerClockDivisor, aTimerModes, aTimerValues):
-		timerMode  = [0] * 6
-		timerValue = [0] * 6
-		
-		# Setting EnableMask
-		enableMask = 128         # Bit 7: UpdateConfig
-		
-		if aEnableCounters[1]:
-			enableMask += 16 # Bit 4: Enable Counter1
-		
-		if aEnableCounters[0]:
-			enableMask += 8  # Bit 3: Enable Counter0
-		
-		numTimers = 0
-		numTimersStop = 0
-		
-		for i in range(6):
-			if aEnableTimers[i] != 0 and numTimersStop == 0:
-				++numTimers
-				timerMode [i] = aTimerModes [i]  # TimerMode
-				timerValue[i] = aTimerValues[i]  # TimerValue
-			else:
-				numTimersStop = 1
-				timerMode [i] = 0
-				timerValue[i] = 0
-		enableMask += numTimers  # Bits 2-0: Number of Timers
-		
-		counterMode = [0, 0]
-		
-		self.ehTimerCounter(TimerClockDivisor, enableMask, TimerClockBaseIndex, 0, timerMode, timerValue, counterMode, False, False)
-	
-	def eTCValues(self, aReadTimers, aUpdateResetTimers, aReadCounters, aResetCounters):
-		timerMode   = [0] * 6
-		counterMode = [0] * 2
-		timerValue  = [0] * 6
-		
-		# UpdateReset
-		updateReset = 0
-		for i in range(6):
-			if aUpdateResetTimers[i] != 0:
-				updateReset += pow(2, i)
-		
-		for i in range(2):
-			if aResetCounters[i] != 0:
-				updateReset += pow(2, 6 + i)
-		
-		return self.ehTimerCounter(0, 0, 0, updateReset, timerMode, timerValue, counterMode, True, True)
-	
 	def ehSingleIO(self, inIOType, inChannel, inDirBipGainDACL, inStateResDACH, inSettlingTime):
 		sendBuff = [0] * 8
 		
@@ -728,6 +680,54 @@ class UE9(common):
 			raise LabJackException(0, "DIO Feedback error : read buffer has wrong command bytes")
 		
 		return recBuff[rvidx] & tempByte
+	
+	def eTCConfig(self, aEnableTimers, aEnableCounters, TCPinOffset, TimerClockBaseIndex, TimerClockDivisor, aTimerModes, aTimerValues):
+		timerMode  = [0] * 6
+		timerValue = [0] * 6
+		
+		# Setting EnableMask
+		enableMask = 128         # Bit 7: UpdateConfig
+		
+		if aEnableCounters[1]:
+			enableMask += 16 # Bit 4: Enable Counter1
+		
+		if aEnableCounters[0]:
+			enableMask += 8  # Bit 3: Enable Counter0
+		
+		numTimers = 0
+		numTimersStop = 0
+		
+		for i in range(6):
+			if aEnableTimers[i] != 0 and numTimersStop == 0:
+				++numTimers
+				timerMode [i] = aTimerModes [i]  # TimerMode
+				timerValue[i] = aTimerValues[i]  # TimerValue
+			else:
+				numTimersStop = 1
+				timerMode [i] = 0
+				timerValue[i] = 0
+		enableMask += numTimers  # Bits 2-0: Number of Timers
+		
+		counterMode = [0, 0]
+		
+		self.ehTimerCounter(TimerClockDivisor, enableMask, TimerClockBaseIndex, 0, timerMode, timerValue, counterMode, False, False)
+	
+	def eTCValues(self, aReadTimers, aUpdateResetTimers, aReadCounters, aResetCounters):
+		timerMode   = [0] * 6
+		counterMode = [0] * 2
+		timerValue  = [0] * 6
+		
+		# UpdateReset
+		updateReset = 0
+		for i in range(6):
+			if aUpdateResetTimers[i] != 0:
+				updateReset += pow(2, i)
+		
+		for i in range(2):
+			if aResetCounters[i] != 0:
+				updateReset += pow(2, 6 + i)
+		
+		return self.ehTimerCounter(0, 0, 0, updateReset, timerMode, timerValue, counterMode, True, True)
 
 class U3(_common):
 	prodID = 3
