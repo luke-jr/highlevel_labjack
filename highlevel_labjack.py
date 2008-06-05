@@ -325,7 +325,7 @@ class _common:
 	def eDO(self, Channel, State):
 		return self.ehDIO_Feedback(Channel, State)
 
-class UE9(common):
+class UE9(_common):
 	_type = LabJackPython.LJ_dtUE9
 	prodID = 9
 	
