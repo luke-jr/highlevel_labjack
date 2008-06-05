@@ -32,7 +32,7 @@ class _common:
 			FF = 1
 		
 		self._LJP = LabJackPython()
-		self._LJ  = self._LJP.OpenLabJack(LabJackPython.LJ_dtUE9, ConnectionType, Address, FF)
+		self._LJ  = self._LJP.OpenLabJack(self._type, ConnectionType, Address, FF)
 	
 	def normalChecksum(self, b):
 		b[0] = self.normalChecksum8(b)
@@ -326,6 +326,7 @@ class _common:
 		return self.ehDIO_Feedback(Channel, State)
 
 class UE9(common):
+	_type = LabJackPython.LJ_dtUE9
 	prodID = 9
 	
 	def getCalibrationInfo(self, caliInfo = True):
@@ -730,6 +731,7 @@ class UE9(common):
 		return (outTimer, outCounter)
 
 class U3(_common):
+	_type = LabJackPython.LJ_dtU3
 	prodID = 3
 	
 	def getCalibrationInfo(self, caliInfo = True):
