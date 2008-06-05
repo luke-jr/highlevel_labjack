@@ -983,10 +983,7 @@ class U3(_common):
 		                                                                # QuickSample (bit 7)
 		sendDataBuff[2] = ChannelN   # Negative channel
 		
-		(
-			recDataBuff,  # outDataBuff
-			__,           # outDataSize
-		) = self.ehFeedback(
+		recDataBuff = self.ehFeedback(
 			sendDataBuff, # inIOTypesDataBuff
 			3,            # inIOTypesDataSize
 			2,            # outDataSize
@@ -1041,10 +1038,7 @@ class U3(_common):
 			sendDataBuff[1] = bytesV & 255            # Value LSB
 			sendDataBuff[2] = (bytesV & 65280) / 256  # Value MSB
 		
-		(
-			__,           # outDataBuff
-			__,           # outDataSize
-		) = self.ehFeedback(
+		self.ehFeedback(
 			sendDataBuff, # inIOTypesDataBuff
 			sendSize,     # inIOTypesDataSize
 			0,            # outDataSize
@@ -1117,10 +1111,7 @@ class U3(_common):
 			if newValue:
 				sendBuff[3]+= 128 # + State (bit 7)
 		
-		(
-			recData,      # outDataBuff
-			__,           # outDataSize
-		) = self.ehFeedback(
+		recData = self.ehFeedback(
 			sendData,     # inIOTypesDataBuff
 			4,            # inIOTypesDataSize
 			len(recData), # outDataSize
@@ -1129,6 +1120,96 @@ class U3(_common):
 		if newValue is None:
 			return recData[0]
 		return newValue
+	
+	def eTCConfig(self, aEnableTimers, aEnableCounters, TCPinOffset, TimerClockBaseIndex, TimerClockDivisor, aTimerModes, aTimerValues):
+		if TCPinOffset < 0 && TCPinOffset > 8:
+			raise LabJackException(0, "eTCConfig error: Invalid TimerCounterPinOffset")
+		
+		# ConfigTimerClock
+		if TimerClockBaseIndex == LJ_tc2MHZ || TimerClockBaseIndex ==  LJ_tc6MHZ || TimerClockBaseIndex == LJ_tc24MHZ || TimerClockBaseIndex == LJ_tc500KHZ_DIV || TimerClockBaseIndex == LJ_tc2MHZ_DIV || TimerClockBaseIndex == LJ_tc6MHZ_DIV || TimerClockBaseIndex == LJ_tc24MHZ_DIV:
+			TimerClockBaseIndex = TimerClockBaseIndex - 10;
+		elif TimerClockBaseIndex == LJ_tc4MHZ || TimerClockBaseIndex ==  LJ_tc12MHZ || TimerClockBaseIndex == LJ_tc48MHZ || TimerClockBaseIndex == LJ_tc1MHZ_DIV || TimerClockBaseIndex == LJ_tc4MHZ_DIV || TimerClockBaseIndex == LJ_tc12MHZ_DIV || TimerClockBaseIndex == LJ_tc48MHZ_DIV:
+			TimerClockBaseIndex = TimerClockBaseIndex - 20;
+		
+		(
+			__,                        # outTimerClockConfig
+			__,                        # outTimerClockDivisor
+		) = self.ehConfigTimerClock(
+			TimerClockBaseIndex + 128, # inTimerClockConfig
+			TimerClockDivisor,         # inTimerClockDivisor
+		)
+		
+		# Using ConfigIO to get current FIOAnalog and curEIOAnalog settings
+		(
+			__,           # outTimerCounterConfig
+			__,           # outDAC1Enable
+			curFIOAnalog, # outFIOAnalog
+			curEIOAnalog, # outEIOAnalog
+		) = ehConfigIO(
+			0,            # inWriteMask
+			0,            # inTimerCounterConfig
+			0,            # inDAC1Enable
+			0,            # inFIOAnalog
+			0,            # inEIOAnalog
+		)
+		
+		numTimers = 0
+		numCounters = 0
+		TimerCounterConfig = 0
+		FIOAnalog = 255
+		EIOAnalog = 255
+		
+		for i in range(2):
+			if aEnableTimers[i]:
+				++numTimers
+			else:
+				break
+		
+		for i in range(2):
+			if aEnableCounters[i]:
+				++numCounters
+				TimerCounterConfig += pow(2, i + 2)
+		
+		TimerCounterConfig += numTimers + TCPinOffset * 16
+		
+		for i in range(numCounters + numTimers):
+			if i + TCPinOffset < 8:
+				FIOAnalog = FIOAnalog - pow(2, i + TCPinOffset)
+			else:
+				EIOAnalog = EIOAnalog - pow(2, i + TCPinOffset - 8)
+		
+		FIOAnalog = FIOAnalog & curFIOAnalog
+		EIOAnalog = EIOAnalog & curEIOAnalog
+		(
+			curTimerCounterConfig, # outTimerCounterConfig
+			__,                    # outDAC1Enable
+			curFIOAnalog,          # outFIOAnalog
+			curEIOAnalog,          # outEIOAnalog
+		) = ehConfigIO(
+			13,                    # inWriteMask
+			TimerCounterConfig,    # inTimerCounterConfig
+			0,                     # inDAC1Enable
+			FIOAnalog,             # inFIOAnalog
+			EIOAnalog,             # inEIOAnalog
+		)
+		
+		if numTimers > 0:
+			# Feedback
+			sendBuff = [0] * 8
+			
+			for i in range(numTimers):
+				sendBuff[    i * 4] = 43 + i * 2                        # TimerConfig
+				sendBuff[1 + i * 4] = aTimerModes[i]                    # TimerMode
+				sendBuff[2 + i * 4] =  aTimerValues[i] & 0x00ff         # Value LSB
+				sendBuff[3 + i * 4] = (aTimerValues[i] & 0xff00) / 256  # Value MSB
+			
+			sendBuffSize = 4 * numTimers
+			
+			self.ehFeedback(
+				sendBuff,     # inIOTypesDataBuff
+				sendBuffSize, # inIOTypesDataSize
+				0,            # outDataSize
+			)
 
 class U3_HV(U3):
 	def binaryToCalibratedAnalogVoltage(self, caliInfo, positiveChannel, negChannel, bytesVoltage):
