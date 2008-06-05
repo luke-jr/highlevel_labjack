@@ -11,6 +11,8 @@ class CalibrationInfo:
 		self.unipolarOffset = [0,0,0,0]
 		self.DACSlope       = [0,0]
 		self.DACOffset      = [0,0]
+		self.hvAINSlope     = [0] * 4
+		self.hvAINOffset    = [0] * 4
 
 class _common:
 	caliInfo = None
@@ -119,10 +121,10 @@ class _common:
 		bytesResponse = self.I2C(options, speedAdjust, sdaPinNum, sclPinNum, address, numByteToSend, numBytesToReceive, bytesCommand, ackArray)
 		
 		# FIXME: Shouldn't these be offset by 8?
-		caliInfo.DACSlopeA  = self.FPuint8ArrayToFPDouble(bytesResponse,  0)
-		caliInfo.DACOffsetA = self.FPuint8ArrayToFPDouble(bytesResponse,  8)
-		caliInfo.DACSlopeB  = self.FPuint8ArrayToFPDouble(bytesResponse, 16)
-		caliInfo.DACOffsetB = self.FPuint8ArrayToFPDouble(bytesResponse, 24)
+		caliInfo.DACSlope [0] = self.FPuint8ArrayToFPDouble(bytesResponse,  0)
+		caliInfo.DACOffset[0] = self.FPuint8ArrayToFPDouble(bytesResponse,  8)
+		caliInfo.DACSlope [1] = self.FPuint8ArrayToFPDouble(bytesResponse, 16)
+		caliInfo.DACOffset[1] = self.FPuint8ArrayToFPDouble(bytesResponse, 24)
 		caliInfo.prodID = self.prodID
 		
 		return err
@@ -181,16 +183,11 @@ class _common:
 	def LJTDACAnalogToCalibratedBinaryVoltage(self, caliInfo, DACNumber, analogVoltage, safetyRange = True):
 		self.isLJTDACCalibrationInfoValid(caliInfo)
 		
-		if False:
-			pass
-		elif DACNumber == 0:
-			slope  = caliInfo.DACSlopeA
-			offset = caliInfo.DACOffsetA
-		elif DACNumber == 1:
-			slope  = caliInfo.DACSlopeB
-			offset = caliInfo.DACOffsetB
-		else:
+		if DACNumber < 0 or DACNumber > 1:
 			raise LabJackException(0, "LJTDACAnalogToCalibratedBinaryVoltage error: invalid DACNumber.")
+		
+		slope  = caliInfo.DACSlope [DACNumber]
+		offset = caliInfo.DACOffset[DACNumber]
 		
 		tempBytesVoltage = slope * analogVoltage + offset
 		
