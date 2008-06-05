@@ -12,8 +12,7 @@ class CalibrationInfo:
 		self.DACSlope       = [0,0]
 		self.DACOffset      = [0,0]
 
-class UE9:
-	prodID = 9
+class _common:
 	caliInfo = None
 	
 	def __init__(self, ConnectionType, Address, FirstFound = True):
@@ -98,72 +97,6 @@ class UE9:
 		else:
 			return time() * 1000
 	
-	def getCalibrationInfo(self, caliInfo = True):
-		if caliInfo is True:
-			if self.caliInfo is None:
-				self.caliInfo = CalibrationInfo()
-			caliInfo = self.caliInfo
-		if caliInfo is None:
-			caliInfo = CalibrationInfo()
-		
-		sendBuffer = [0] *   8
-		recBuffers = []
-		sentRec = 0
-		
-		# initialize request
-		sendBuffer[1] = 0xF8  # command byte
-		sendBuffer[2] = 0x01  # number of data words
-		sendBuffer[3] = 0x2A  # extended command number
-		sendBuffer[6] = 0x00
-		
-		# reading blocks from memory
-		for idx in range(6):
-			sendBuffer[7] = idx
-			LabJackPython.SetChecksum(sendBuffer)
-			
-			self._LJP.Write(self._LJ, sendBuffer, 8)
-			
-			(sentRec, recBuffer) = self._LJP.Read(self._LJ, False, 136)
-			
-			if sentRec < 136:
-				raise LabJackException(0, "getCalibrationInfo recv did not receive all of the buffer")
-			
-			if recBuffer[1] != 0xF8 or recBuffer[2] != 0x41 or recBuffer[3] != 0x2A:
-				raise LabJackException(0, "getCalibrationInfo received wrong command bytes for ReadMem")
-			
-			recBuffers.append(recBuffer)
-		
-		offset = 8
-		for i in range(4):
-			# block data starts on byte 8 of the buffer
-			caliInfo.unipolarSlope [i] = self.FPuint8ArrayToFPDouble(recBuffers[0], offset)
-			offset += 8
-			caliInfo.unipolarOffset[i] = self.FPuint8ArrayToFPDouble(recBuffers[0], offset)
-			offset += 8
-		
-		caliInfo.bipolarSlope  = self.FPuint8ArrayToFPDouble(recBuffers[1],   8)
-		caliInfo.bipolarOffset = self.FPuint8ArrayToFPDouble(recBuffers[1],  16)
-		
-		caliInfo.DACSlope [0]  = self.FPuint8ArrayToFPDouble(recBuffers[2],   8)
-		caliInfo.DACOffset[0]  = self.FPuint8ArrayToFPDouble(recBuffers[2],  16)
-		caliInfo.DACSlope [1]  = self.FPuint8ArrayToFPDouble(recBuffers[2],  24)
-		caliInfo.DACOffset[1]  = self.FPuint8ArrayToFPDouble(recBuffers[2],  32)
-		caliInfo.tempSlope     = self.FPuint8ArrayToFPDouble(recBuffers[2],  40)
-		caliInfo.tempSlopeLow  = self.FPuint8ArrayToFPDouble(recBuffers[2],  56)
-		caliInfo.calTemp       = self.FPuint8ArrayToFPDouble(recBuffers[2],  72)
-		caliInfo.Vref          = self.FPuint8ArrayToFPDouble(recBuffers[2],  80)
-		caliInfo.VrefDiv2      = self.FPuint8ArrayToFPDouble(recBuffers[2],  96)
-		caliInfo.VsSlope       = self.FPuint8ArrayToFPDouble(recBuffers[2], 104)
-		
-		caliInfo.hiResUnipolarSlope  = self.FPuint8ArrayToFPDouble(recBuffers[3],  8)
-		caliInfo.hiResUnipolarOffset = self.FPuint8ArrayToFPDouble(recBuffers[3], 16)
-		
-		caliInfo.hiResBipolarSlope   = self.FPuint8ArrayToFPDouble(recBuffers[4],  8)
-		caliInfo.hiResBipolarOffset  = self.FPuint8ArrayToFPDouble(recBuffers[4], 16)
-		caliInfo.prodID = self.prodID
-		
-		return caliInfo
-	
 	def getLJTDACCalibrationInfo(self, caliInfo, DIOAPinNum):
 		bytesCommand  = [0] *  2
 		bytesResponse = [0] * 32
@@ -217,29 +150,6 @@ class UE9:
 			return isCalibrationInfoValid(caliInfo)
 		except LabJackException:
 			raise LabJackException(0, "Invalid LJTDAC calibration info.")
-	
-	def binaryToCalibratedAnalogVoltage(self, caliInfo, gainBip, resolution, bytesVoltage):
-		self.isCalibrationInfoValid(caliInfo)
-		
-		slope = offset = None
-		if resolution < 18:
-			if gainBip == 8:
-				slope  = caliInfo.bipolarSlope
-				offset = caliInfo.bipolarOffset
-			elif gainBip >= 0 and gainBip < 4:
-				slope  = caliInfo.unipolarSlope [gainBip]
-				offset = caliInfo.unipolarOffset[gainBip]
-		else: # UE9 Pro high res
-			if gainBip == 8:
-				slope  = caliInfo.hiResBipolarSlope;
-				offset = caliInfo.hiResBipolarOffset;
-			elif gainBip == 0:
-				slope  = caliInfo.hiResUnipolarSlope
-				offset = caliInfo.hiResUnipolarOffset
-		if slope is None:
-			raise LabJackException(0, "binaryToCalibratedAnalogVoltage error: invalid GainBip.")
-		
-		return (slope * bytesVoltage) + offset
 	
 	def analogToCalibratedBinaryVoltage(self, caliInfo, DACNumber, analogVoltage, safetyRange = True):
 		self.isCalibrationInfoValid(caliInfo)
@@ -313,37 +223,6 @@ class UE9:
 		
 		return bytesTemperature * slope
 	
-	_gainBipMap = {
-		0: {
-			'slope' :  0.000077503,
-			'offset': -0.012,
-		},
-		1: {
-			'slope' :  0.000038736,
-			'offset': -0.012,
-		},
-		2: {
-			'slope' :  0.000019353,
-			'offset': -0.012,
-		},
-		3: {
-			'slope' :  0.0000096764,
-			'offset': -0.012,
-		},
-		8: {
-			'slope' :  0.00015629,
-			'offset': -5.1760,
-		},
-	}
-	
-	def binaryToUncalibratedAnalogVoltage(self, gainBip, resolution, bytesVoltage):
-		if (resolution > 17 and (gainBip != 0 and gainBip != 8)) or not gainBip in self._gainBipMap:
-			raise LabJackException(0, "binaryToUncalibratedAnalogVoltage error: invalid GainBip.")
-		slope  = self._gainBipMap[gainBip]['slope' ]
-		offset = self._gainBipMap[gainBip]['offset']
-		
-		return (slope * bytesVoltage) + offset
-	
 	_uncali_mult = 842.59
 	_uncali_max = 4095
 	def analogToUncalibratedBinaryVoltage(self, analogVoltage, safetyRange = True):
@@ -362,9 +241,6 @@ class UE9:
 			tempBytesVoltage = _uncali_max
 		
 		return tempBytesVoltage
-	
-	def binaryToUncalibratedAnalogTemperature(self, bytesTemperature):
-		return bytesTemperature * 0.012968
 	
 	def I2C(self, I2COptions, SpeedAdjust, SDAPinNum, SCLPinNum, AddressByte, NumI2CBytesToReceive, I2CBytesCommand):
 		checksumTotal = 0
@@ -442,82 +318,6 @@ class UE9:
 			raise LabJackException(0, "I2C error : expected an ack of %d, but received %d" % (expectedAckArray, ackArrayTotal))
 		
 		return (AckArray, I2CBytesResponse)
-	
-	_RangeGainAssoc = {
-		LabJackPython.LJ_rgBIP5V   : 8,
-		LabJackPython.LJ_rgUNI5V   : 0,
-		LabJackPython.LJ_rgUNI2P5V : 1,
-		LabJackPython.LJ_rgUNI1P25V: 2,
-		LabJackPython.LJ_rgUNIP625V: 3,
-	}
-	
-	def eAIN(self, ChannelP, ChannelN, Range, Resolution, Settling, Binary, caliInfo = True):
-		if caliInfo is True:
-			caliInfo = self.caliInfo
-		
-		if not Range in self._RangeGainAssoc:
-			raise LabJackException(0, "eAIN error: Invalid Range")
-		ainGain = self._RangeGainAssoc[Range]
-		
-		(
-			IOType,     # outIOType
-			Channel,    # outChannel
-			__,         # outDirAINL
-			AINM,       # outStateAINL
-			AINH,       # outAINH
-		) = self.ehSingleIO(
-			4,          # inIOType
-			ChannelP,   # inChannel
-			ainGain,    # inDirBipGainDACL
-			Resolution, # inStateResDACH
-			Settling,   # inSettlingTime
-		)
-		
-		bytesVT = AINM + AINH * 256
-		
-		if Binary:
-			return bytesVT
-		
-		try:
-			self.isCalibrationInfoValid(caliInfo)
-			infoValid = True
-		except LabJackException:
-			infoValid = False
-		
-		if not infoValid:
-			if Channel  == 133 or ChannelP == 141:
-				return self.binaryToUncalibratedAnalogTemperature(bytesVT)
-			return self.binaryToUncalibratedAnalogVoltage(ainGain, Resolution, bytesVT)
-		
-		if ChannelP == 133 or ChannelP == 141:
-			return self.binaryToCalibratedAnalogTemperature(caliInfo, 0, bytesVT)
-		return self.binaryToCalibratedAnalogVoltage(caliInfo, ainGain, Resolution, bytesVT)
-	
-	def eDAC(self, caliInfo, Channel, Voltage, Binary):
-		try:
-			self.isCalibrationInfoValid(caliInfo)
-			infoValid = True
-		except LabJackException:
-			infoValid = False
-		
-		if not infoValid:
-			bytesVoltage = self.analogToUncalibratedBinaryVoltage(Voltage)
-		else:
-			bytesVoltage = self.analogToCalibratedBinaryVoltage(caliInfo, Channel, Voltage)
-		
-		(
-			IOType,     # outIOType
-			OutChannel, # outChannel
-			__,         # outDirAINL
-			__,         # outStateAINL
-			__,         # outAINH
-		) = self.ehSingleIO(
-			5,          # inIOType
-			Channel,    # inChannel
-			bytesVoltage & 0x00FF,
-			(bytesVoltage / 256) + 192,
-			0,
-		)
 	
 	def eDI(self, Channel):
 		return self.ehDIO_Feedback(Channel)
@@ -727,7 +527,209 @@ class UE9:
 		
 		return (outTimer, outCounter)
 
-class U3(UE9):
+class UE9(common):
+	prodID = 9
+	
+	def getCalibrationInfo(self, caliInfo = True):
+		if caliInfo is True:
+			if self.caliInfo is None:
+				self.caliInfo = CalibrationInfo()
+			caliInfo = self.caliInfo
+		if caliInfo is None:
+			caliInfo = CalibrationInfo()
+		
+		sendBuffer = [0] *   8
+		recBuffers = []
+		sentRec = 0
+		
+		# initialize request
+		sendBuffer[1] = 0xF8  # command byte
+		sendBuffer[2] = 0x01  # number of data words
+		sendBuffer[3] = 0x2A  # extended command number
+		sendBuffer[6] = 0x00
+		
+		# reading blocks from memory
+		for idx in range(6):
+			sendBuffer[7] = idx
+			LabJackPython.SetChecksum(sendBuffer)
+			
+			self._LJP.Write(self._LJ, sendBuffer, 8)
+			
+			(sentRec, recBuffer) = self._LJP.Read(self._LJ, False, 136)
+			
+			if sentRec < 136:
+				raise LabJackException(0, "getCalibrationInfo recv did not receive all of the buffer")
+			
+			if recBuffer[1] != 0xF8 or recBuffer[2] != 0x41 or recBuffer[3] != 0x2A:
+				raise LabJackException(0, "getCalibrationInfo received wrong command bytes for ReadMem")
+			
+			recBuffers.append(recBuffer)
+		
+		offset = 8
+		for i in range(4):
+			# block data starts on byte 8 of the buffer
+			caliInfo.unipolarSlope [i] = self.FPuint8ArrayToFPDouble(recBuffers[0], offset)
+			offset += 8
+			caliInfo.unipolarOffset[i] = self.FPuint8ArrayToFPDouble(recBuffers[0], offset)
+			offset += 8
+		
+		caliInfo.bipolarSlope  = self.FPuint8ArrayToFPDouble(recBuffers[1],   8)
+		caliInfo.bipolarOffset = self.FPuint8ArrayToFPDouble(recBuffers[1],  16)
+		
+		caliInfo.DACSlope [0]  = self.FPuint8ArrayToFPDouble(recBuffers[2],   8)
+		caliInfo.DACOffset[0]  = self.FPuint8ArrayToFPDouble(recBuffers[2],  16)
+		caliInfo.DACSlope [1]  = self.FPuint8ArrayToFPDouble(recBuffers[2],  24)
+		caliInfo.DACOffset[1]  = self.FPuint8ArrayToFPDouble(recBuffers[2],  32)
+		caliInfo.tempSlope     = self.FPuint8ArrayToFPDouble(recBuffers[2],  40)
+		caliInfo.tempSlopeLow  = self.FPuint8ArrayToFPDouble(recBuffers[2],  56)
+		caliInfo.calTemp       = self.FPuint8ArrayToFPDouble(recBuffers[2],  72)
+		caliInfo.Vref          = self.FPuint8ArrayToFPDouble(recBuffers[2],  80)
+		caliInfo.VrefDiv2      = self.FPuint8ArrayToFPDouble(recBuffers[2],  96)
+		caliInfo.VsSlope       = self.FPuint8ArrayToFPDouble(recBuffers[2], 104)
+		
+		caliInfo.hiResUnipolarSlope  = self.FPuint8ArrayToFPDouble(recBuffers[3],  8)
+		caliInfo.hiResUnipolarOffset = self.FPuint8ArrayToFPDouble(recBuffers[3], 16)
+		
+		caliInfo.hiResBipolarSlope   = self.FPuint8ArrayToFPDouble(recBuffers[4],  8)
+		caliInfo.hiResBipolarOffset  = self.FPuint8ArrayToFPDouble(recBuffers[4], 16)
+		caliInfo.prodID = self.prodID
+		
+		return caliInfo
+	
+	def binaryToCalibratedAnalogVoltage(self, caliInfo, gainBip, resolution, bytesVoltage):
+		self.isCalibrationInfoValid(caliInfo)
+		
+		slope = offset = None
+		if resolution < 18:
+			if gainBip == 8:
+				slope  = caliInfo.bipolarSlope
+				offset = caliInfo.bipolarOffset
+			elif gainBip >= 0 and gainBip < 4:
+				slope  = caliInfo.unipolarSlope [gainBip]
+				offset = caliInfo.unipolarOffset[gainBip]
+		else: # UE9 Pro high res
+			if gainBip == 8:
+				slope  = caliInfo.hiResBipolarSlope;
+				offset = caliInfo.hiResBipolarOffset;
+			elif gainBip == 0:
+				slope  = caliInfo.hiResUnipolarSlope
+				offset = caliInfo.hiResUnipolarOffset
+		if slope is None:
+			raise LabJackException(0, "binaryToCalibratedAnalogVoltage error: invalid GainBip.")
+		
+		return (slope * bytesVoltage) + offset
+	
+	_gainBipMap = {
+		0: {
+			'slope' :  0.000077503,
+			'offset': -0.012,
+		},
+		1: {
+			'slope' :  0.000038736,
+			'offset': -0.012,
+		},
+		2: {
+			'slope' :  0.000019353,
+			'offset': -0.012,
+		},
+		3: {
+			'slope' :  0.0000096764,
+			'offset': -0.012,
+		},
+		8: {
+			'slope' :  0.00015629,
+			'offset': -5.1760,
+		},
+	}
+	
+	def binaryToUncalibratedAnalogVoltage(self, gainBip, resolution, bytesVoltage):
+		if (resolution > 17 and (gainBip != 0 and gainBip != 8)) or not gainBip in self._gainBipMap:
+			raise LabJackException(0, "binaryToUncalibratedAnalogVoltage error: invalid GainBip.")
+		slope  = self._gainBipMap[gainBip]['slope' ]
+		offset = self._gainBipMap[gainBip]['offset']
+		
+		return (slope * bytesVoltage) + offset
+	
+	def binaryToUncalibratedAnalogTemperature(self, bytesTemperature):
+		return bytesTemperature * 0.012968
+	
+	_RangeGainAssoc = {
+		LabJackPython.LJ_rgBIP5V   : 8,
+		LabJackPython.LJ_rgUNI5V   : 0,
+		LabJackPython.LJ_rgUNI2P5V : 1,
+		LabJackPython.LJ_rgUNI1P25V: 2,
+		LabJackPython.LJ_rgUNIP625V: 3,
+	}
+	
+	def eAIN(self, ChannelP, ChannelN, Range, Resolution, Settling, Binary, caliInfo = True):
+		if caliInfo is True:
+			caliInfo = self.caliInfo
+		
+		if not Range in self._RangeGainAssoc:
+			raise LabJackException(0, "eAIN error: Invalid Range")
+		ainGain = self._RangeGainAssoc[Range]
+		
+		(
+			IOType,     # outIOType
+			Channel,    # outChannel
+			__,         # outDirAINL
+			AINM,       # outStateAINL
+			AINH,       # outAINH
+		) = self.ehSingleIO(
+			4,          # inIOType
+			ChannelP,   # inChannel
+			ainGain,    # inDirBipGainDACL
+			Resolution, # inStateResDACH
+			Settling,   # inSettlingTime
+		)
+		
+		bytesVT = AINM + AINH * 256
+		
+		if Binary:
+			return bytesVT
+		
+		try:
+			self.isCalibrationInfoValid(caliInfo)
+			infoValid = True
+		except LabJackException:
+			infoValid = False
+		
+		if not infoValid:
+			if Channel  == 133 or ChannelP == 141:
+				return self.binaryToUncalibratedAnalogTemperature(bytesVT)
+			return self.binaryToUncalibratedAnalogVoltage(ainGain, Resolution, bytesVT)
+		
+		if ChannelP == 133 or ChannelP == 141:
+			return self.binaryToCalibratedAnalogTemperature(caliInfo, 0, bytesVT)
+		return self.binaryToCalibratedAnalogVoltage(caliInfo, ainGain, Resolution, bytesVT)
+	
+	def eDAC(self, caliInfo, Channel, Voltage, Binary):
+		try:
+			self.isCalibrationInfoValid(caliInfo)
+			infoValid = True
+		except LabJackException:
+			infoValid = False
+		
+		if not infoValid:
+			bytesVoltage = self.analogToUncalibratedBinaryVoltage(Voltage)
+		else:
+			bytesVoltage = self.analogToCalibratedBinaryVoltage(caliInfo, Channel, Voltage)
+		
+		(
+			IOType,     # outIOType
+			OutChannel, # outChannel
+			__,         # outDirAINL
+			__,         # outStateAINL
+			__,         # outAINH
+		) = self.ehSingleIO(
+			5,          # inIOType
+			Channel,    # inChannel
+			bytesVoltage & 0x00FF,
+			(bytesVoltage / 256) + 192,
+			0,
+		)
+
+class U3(_common):
 	prodID = 3
 	
 	def getCalibrationInfo(self, caliInfo = True):
@@ -892,12 +894,12 @@ class U3(UE9):
 	def analogToUncalibratedBinary8BitVoltage(self, analogVoltage, safetyRange = True):
 		self._uncali_mult = 51.717
 		self._uncali_max = 255
-		return UE9.analogToUncalibratedBinaryVoltage(caliInfo, analogVoltage, safetyRange)
+		return _common.analogToUncalibratedBinaryVoltage(caliInfo, analogVoltage, safetyRange)
 	
 	def analogToUncalibratedBinary16BitVoltage(self, analogVoltage, safetyRange = True):
 		self._uncali_mult = 51.717 * 256
 		self._uncali_max = 65535
-		return UE9.analogToUncalibratedBinaryVoltage(caliInfo, analogVoltage, safetyRange)
+		return _common.analogToUncalibratedBinaryVoltage(caliInfo, analogVoltage, safetyRange)
 	
 	def binaryToUncalibratedAnalogTemperature(self, bytesTemperature):
 		return bytesTemperature * 0.013021
