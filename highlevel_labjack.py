@@ -325,44 +325,6 @@ class _common:
 	def eDO(self, Channel, State):
 		return self.ehDIO_Feedback(Channel, State)
 	
-	def ehSingleIO(self, inIOType, inChannel, inDirBipGainDACL, inStateResDACH, inSettlingTime):
-		sendBuff = [0] * 8
-		
-		sendBuff[1] = 0xA3             # command byte
-		sendBuff[2] = inIOType         # IOType
-		sendBuff[3] = inChannel        # Channel
-		sendBuff[4] = inDirBipGainDACL # Dir/BipGain/DACL
-		sendBuff[5] = inStateResDACH   # State/Resolution/DACH
-		sendBuff[6] = inSettlingTime   # Settling time
-		sendBuff[7] = 0                # Reserved
-		sendBuff[0] = reduce(lambda x,y:x+y, sendBuff[1:]) & 0xff
-		
-		# Sending command to UE9
-		self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
-		
-		# Reading response from UE9
-		recSize = 8
-		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
-		if recChars < recSize:
-			if recChars == 0:
-				raise Exception(0, "Read failed");
-			else:
-				raise Exception(0, "Only read %d of %d bytes" % (recChars, recSize))
-		chksum = recBuff[0]
-		self._LJP.SetChecksum8(recBuff, recSize)
-		if chksum != recBuff[0]:
-			raise Exception(0, "Read buffer has bad checksum")
-		if recBuff[1] != 0xA3:
-			raise Exception(0, "Read buffer has wrong command byte")
-		
-		return (
-			recBuff[2], # outIOType
-			recBuff[3], # outChannel
-			recBuff[4], # outDirAINL
-			recBuff[5], # outStateAINL
-			recBuff[6], # outAINH
-		)
-	
 	def ehTimerCounter(self, inTimerClockDivisor, inEnableMask, inTimerClockBase, inUpdateReset, inTimerMode, inTimerValue, inCounterMode, outTimer, outCounter):
 		sendBuff = [0] * 30
 		recBuff  = [0] * 40
@@ -728,6 +690,44 @@ class UE9(common):
 				updateReset += pow(2, 6 + i)
 		
 		return self.ehTimerCounter(0, 0, 0, updateReset, timerMode, timerValue, counterMode, True, True)
+	
+	def ehSingleIO(self, inIOType, inChannel, inDirBipGainDACL, inStateResDACH, inSettlingTime):
+		sendBuff = [0] * 8
+		
+		sendBuff[1] = 0xA3             # command byte
+		sendBuff[2] = inIOType         # IOType
+		sendBuff[3] = inChannel        # Channel
+		sendBuff[4] = inDirBipGainDACL # Dir/BipGain/DACL
+		sendBuff[5] = inStateResDACH   # State/Resolution/DACH
+		sendBuff[6] = inSettlingTime   # Settling time
+		sendBuff[7] = 0                # Reserved
+		sendBuff[0] = reduce(lambda x,y:x+y, sendBuff[1:]) & 0xff
+		
+		# Sending command to UE9
+		self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
+		
+		# Reading response from UE9
+		recSize = 8
+		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+		if recChars < recSize:
+			if recChars == 0:
+				raise Exception(0, "Read failed");
+			else:
+				raise Exception(0, "Only read %d of %d bytes" % (recChars, recSize))
+		chksum = recBuff[0]
+		self._LJP.SetChecksum8(recBuff, recSize)
+		if chksum != recBuff[0]:
+			raise Exception(0, "Read buffer has bad checksum")
+		if recBuff[1] != 0xA3:
+			raise Exception(0, "Read buffer has wrong command byte")
+		
+		return (
+			recBuff[2], # outIOType
+			recBuff[3], # outChannel
+			recBuff[4], # outDirAINL
+			recBuff[5], # outStateAINL
+			recBuff[6], # outAINH
+		)
 
 class U3(_common):
 	prodID = 3
