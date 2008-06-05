@@ -324,69 +324,6 @@ class _common:
 	
 	def eDO(self, Channel, State):
 		return self.ehDIO_Feedback(Channel, State)
-	
-	def ehTimerCounter(self, inTimerClockDivisor, inEnableMask, inTimerClockBase, inUpdateReset, inTimerMode, inTimerValue, inCounterMode, outTimer, outCounter):
-		sendBuff = [0] * 30
-		recBuff  = [0] * 40
-		
-		sendBuff[1] = 0xF8  # command byte
-		sendBuff[2] = 0x0C  # number of data words
-		sendBuff[3] = 0x18  # extended command number
-		
-		sendBuff[6] = inTimerClockDivisor  # TimerClockDivisor
-		sendBuff[7] = inEnableMask         # EnableMask
-		sendBuff[8] = inTimerClockBase     # TimerClockBase
-		
-		sendBuff[9] = inUpdateReset        # UpdateReset
-		
-		for i in range(6):
-			sendBuff[10+i*3] =  inTimerMode [i]                 # TimerMode
-			sendBuff[11+i*3] =  inTimerValue[i] &   0xFF        # TimerValue (low byte)
-			sendBuff[12+i*3] = (inTimerValue[i] & 0xFF00) / 256 # TimerValue (high byte)
-		
-		sendBuff[28:30] = inCounterMode[0:2]  # CounterMode
-		
-		extendedChecksum(sendBuff)
-		
-		# Sending command to UE9
-		self._LJP.Write(self._LJ, sendBuff, 30)
-		
-		# Reading response from UE9
-		(recChars, recBuff) = self._LJP.Read(self._LJ, False, 40)
-		if recChars == 0:
-			raise LabJackException(0, "ehTimerCounter error : read failed")
-		if recChars < 40:
-			raise LabJackException(0, "ehTimerCounter error : did not read all of the buffer")
-		
-		checksumTotal = self.extendedChecksum16(recBuff)
-		if (checksumTotal / 256) & 0xff != recBuff[5]:
-			raise LabJackException(0, "ehTimerCounter error : read buffer has bad checksum16(MSB)")
-		
-		if  checksumTotal        & 0xff != recBuff[4]:
-			raise LabJackException(0, "ehTimerCounter error : read buffer has bad checksum16(LBS)")
-		
-		if extendedChecksum8(recBuff) != recBuff[0]:
-			raise LabJackException(0, "ehTimerCounter error : read buffer has bad checksum8")
-		
-		if recBuff[1] != 0xF8 or recBuff[2] != 0x11 or recBuff[3] != 0x18:
-			raise LabJackException(0, "ehTimerCounter error : read buffer has wrong command bytes for TimerCounter")
-		
-		if outTimer:
-			outTimer = [0] * 6
-			for i in range(6):
-				for j in range(4):
-					outTimer  [i] += recBuff[ 8 + j + i * 4] * pow(2, 8 * j)
-		
-		if outCounter:
-			outCounter = [0] * 2
-			for i in range(2):
-				for j in range(4):
-					outCounter[i] += recBuff[32 + j + i * 4] * pow(2, 8 * j)
-		
-		if recBuff[6]:
-			raise LabJackException(recBuff[6], "ehTimerCounter returns error %d" % recBuff[6])
-		
-		return (outTimer, outCounter)
 
 class UE9(common):
 	prodID = 9
@@ -728,6 +665,69 @@ class UE9(common):
 			recBuff[5], # outStateAINL
 			recBuff[6], # outAINH
 		)
+	
+	def ehTimerCounter(self, inTimerClockDivisor, inEnableMask, inTimerClockBase, inUpdateReset, inTimerMode, inTimerValue, inCounterMode, outTimer, outCounter):
+		sendBuff = [0] * 30
+		recBuff  = [0] * 40
+		
+		sendBuff[1] = 0xF8  # command byte
+		sendBuff[2] = 0x0C  # number of data words
+		sendBuff[3] = 0x18  # extended command number
+		
+		sendBuff[6] = inTimerClockDivisor  # TimerClockDivisor
+		sendBuff[7] = inEnableMask         # EnableMask
+		sendBuff[8] = inTimerClockBase     # TimerClockBase
+		
+		sendBuff[9] = inUpdateReset        # UpdateReset
+		
+		for i in range(6):
+			sendBuff[10+i*3] =  inTimerMode [i]                 # TimerMode
+			sendBuff[11+i*3] =  inTimerValue[i] &   0xFF        # TimerValue (low byte)
+			sendBuff[12+i*3] = (inTimerValue[i] & 0xFF00) / 256 # TimerValue (high byte)
+		
+		sendBuff[28:30] = inCounterMode[0:2]  # CounterMode
+		
+		extendedChecksum(sendBuff)
+		
+		# Sending command to UE9
+		self._LJP.Write(self._LJ, sendBuff, 30)
+		
+		# Reading response from UE9
+		(recChars, recBuff) = self._LJP.Read(self._LJ, False, 40)
+		if recChars == 0:
+			raise LabJackException(0, "ehTimerCounter error : read failed")
+		if recChars < 40:
+			raise LabJackException(0, "ehTimerCounter error : did not read all of the buffer")
+		
+		checksumTotal = self.extendedChecksum16(recBuff)
+		if (checksumTotal / 256) & 0xff != recBuff[5]:
+			raise LabJackException(0, "ehTimerCounter error : read buffer has bad checksum16(MSB)")
+		
+		if  checksumTotal        & 0xff != recBuff[4]:
+			raise LabJackException(0, "ehTimerCounter error : read buffer has bad checksum16(LBS)")
+		
+		if extendedChecksum8(recBuff) != recBuff[0]:
+			raise LabJackException(0, "ehTimerCounter error : read buffer has bad checksum8")
+		
+		if recBuff[1] != 0xF8 or recBuff[2] != 0x11 or recBuff[3] != 0x18:
+			raise LabJackException(0, "ehTimerCounter error : read buffer has wrong command bytes for TimerCounter")
+		
+		if outTimer:
+			outTimer = [0] * 6
+			for i in range(6):
+				for j in range(4):
+					outTimer  [i] += recBuff[ 8 + j + i * 4] * pow(2, 8 * j)
+		
+		if outCounter:
+			outCounter = [0] * 2
+			for i in range(2):
+				for j in range(4):
+					outCounter[i] += recBuff[32 + j + i * 4] * pow(2, 8 * j)
+		
+		if recBuff[6]:
+			raise LabJackException(recBuff[6], "ehTimerCounter returns error %d" % recBuff[6])
+		
+		return (outTimer, outCounter)
 
 class U3(_common):
 	prodID = 3
