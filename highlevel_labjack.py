@@ -760,11 +760,13 @@ class U3(_common):
 		if sentRec < 38:
 			raise LabJackException(0, "getCalibrationInfo recv did not receive all of the buffer")
 		
-		if cU3RecBuffer[1] != 0xF8 || cU3RecBuffer[2] != 0x10 || cU3RecBuffer[3] != 0x08:
+		if cU3RecBuffer[1] != 0xF8 or cU3RecBuffer[2] != 0x10 or cU3RecBuffer[3] != 0x08:
 			raise LabJackException(0, "getCalibrationInfo received wrong command bytes for ConfigU3")
 		
 		caliInfo.hardwareVersion = cU3RecBuffer[14] + cU3RecBuffer[13] / 100.
-		caliInfo.highVoltage = (((cU3RecBuffer[37] & 18) == 18) ? 1 : 0)
+		caliInfo.highVoltage = 0
+		if cU3RecBuffer[37] & 18 == 18:
+			caliInfo.highVoltage = 1
 		
 		# initialize request
 		sendBuffer[1] = 0xF8  # command byte
@@ -825,7 +827,7 @@ class U3(_common):
 			else:
 				return binaryToCalibratedAnalogVoltage_hw130(caliInfo, 0, negChannel, bytesVoltage, analogVoltage)
 		
-		if (negChannel >= 0 && negChannel <= 15) || negChannel == 30:
+		if (negChannel >= 0 and negChannel <= 15) or negChannel == 30:
 			if dacEnabled == 0:
 				analogVoltage = caliInfo.ainDiffSlope * bytesVoltage + caliInfo.ainDiffOffset
 			else:
@@ -873,7 +875,7 @@ class U3(_common):
 		return tempBytesVoltage
 	
 	def binaryToUncalibratedAnalogVoltage(self, dac1Enabled, negChannel, bytesVoltage):
-		if (negChannel >= 0 && negChannel <= 15) or negChannel == 30:
+		if (negChannel >= 0 and negChannel <= 15) or negChannel == 30:
 			if dac1Enabled == 0:
 				analogVoltage = bytesVoltage * 0.000074463 - 2.44
 			else:
@@ -906,7 +908,7 @@ class U3(_common):
 	
 	#TODO: new output DAC1Enable
 	# NOTE: moved ConfigIO param to the end optional for UE9 compat
-	def eAIN(self, ChannelP, ChannelN, Range, Resolution, Settling, Binary, caliInfo = True, ConfigIO = False):
+	def eAIN(self, ChannelP, ChannelN, Range, Resolution, inSettling, Binary, caliInfo = True, ConfigIO = False):
 		if caliInfo is True:
 			caliInfo = self.caliInfo
 		
@@ -915,13 +917,13 @@ class U3(_common):
 		hwver = caliInfo.hardwareVersion
 		hv = caliInfo.highVoltage
 		
-		if ChannelP < 0 || (ChannelP > 15 && ChannelP != 30 && ChannelP != 31):
+		if ChannelP < 0 or (ChannelP > 15 and ChannelP != 30 and ChannelP != 31):
 			raise LabJackException(0, "eAIN error: Invalid positive channel")
 		
-		if ChannelN < 0 || (ChannelN > 15 && ChannelN != 30 && ChannelN != 31) || (hwver >= 1.3 && hv == 1 && ((ChannelP < 4 && ChannelN != 31) || ChannelN < 4)):
+		if ChannelN < 0 or (ChannelN > 15 and ChannelN != 30 and ChannelN != 31) or (hwver >= 1.3 and hv == 1 and ((ChannelP < 4 and ChannelN != 31) or ChannelN < 4)):
 			raise LabJackException(0, "eAIN error: Invalid negative channel")
 		
-		if hwver >= 1.3 && hv == 1 && ChannelP < 4:
+		if hwver >= 1.3 and hv == 1 and ChannelP < 4:
 			pass
 		elif ConfigIO:
 			FIOAnalog = 0
@@ -955,7 +957,7 @@ class U3(_common):
 			
 			DAC1Enable = outDAC1Enable
 			
-			if !(FIOAnalog == curFIOAnalog && EIOAnalog == curEIOAnalog):
+			if not (FIOAnalog == curFIOAnalog and EIOAnalog == curEIOAnalog):
 				# Creating new FIOAnalog and EIOAnalog settings
 				FIOAnalog = FIOAnalog | curFIOAnalog
 				EIOAnalog = EIOAnalog | curEIOAnalog
@@ -978,8 +980,10 @@ class U3(_common):
 		sendDataBuff = [0] * 3
 		sendDataBuff[0] = 1;    # IOType is AIN
 		
-		settling = (Settling != 0) ? 1 : 0
-		quicksample = (Resolution != 0) ? 1 : 0
+		settling = 0
+		if inSettling: settling = 1
+		quicksample = 0
+		if Resolution: quicksample = 1
 		sendDataBuff[1] = ChannelP + settling * 64 + quicksample * 128  # Positive channel (bits 0-4), LongSettling (bit 6)
 		                                                                # QuickSample (bit 7)
 		sendDataBuff[2] = ChannelN   # Negative channel
@@ -1073,7 +1077,7 @@ class U3(_common):
 				0,            # inEIOAnalog
 			)
 			
-			if !(FIOAnalog == curFIOAnalog && EIOAnalog == curEIOAnalog):
+			if not (FIOAnalog == curFIOAnalog and EIOAnalog == curEIOAnalog):
 				# Creating new FIOAnalog and EIOAnalog settings
 				# Using ConfigIO to get current FIOAnalog and EIOAnalog settings
 				FIOAnalog = FIOAnalog & curFIOAnalog
@@ -1106,9 +1110,11 @@ class U3(_common):
 			if newValue:
 				sendBuff[3]+= 128 # + State (bit 7)
 		
+		recSize = 0
+		if newValue is None: recSize = 1
 		recBuff = self.ehFeedback(
 			sendBuff,                    # inIOTypesDataBuff
-			(newValue is None) ? 1 : 0,  # outDataSize
+			recSize,   # outDataSize
 		)
 		
 		if newValue is None:
@@ -1116,13 +1122,13 @@ class U3(_common):
 		return newValue
 	
 	def eTCConfig(self, aEnableTimers, aEnableCounters, TCPinOffset, TimerClockBaseIndex, TimerClockDivisor, aTimerModes, aTimerValues):
-		if TCPinOffset < 0 && TCPinOffset > 8:
+		if TCPinOffset < 0 and TCPinOffset > 8:
 			raise LabJackException(0, "eTCConfig error: Invalid TimerCounterPinOffset")
 		
 		# ConfigTimerClock
-		if TimerClockBaseIndex == LJ_tc2MHZ || TimerClockBaseIndex ==  LJ_tc6MHZ || TimerClockBaseIndex == LJ_tc24MHZ || TimerClockBaseIndex == LJ_tc500KHZ_DIV || TimerClockBaseIndex == LJ_tc2MHZ_DIV || TimerClockBaseIndex == LJ_tc6MHZ_DIV || TimerClockBaseIndex == LJ_tc24MHZ_DIV:
+		if TimerClockBaseIndex == LJ_tc2MHZ or TimerClockBaseIndex ==  LJ_tc6MHZ or TimerClockBaseIndex == LJ_tc24MHZ or TimerClockBaseIndex == LJ_tc500KHZ_DIV or TimerClockBaseIndex == LJ_tc2MHZ_DIV or TimerClockBaseIndex == LJ_tc6MHZ_DIV or TimerClockBaseIndex == LJ_tc24MHZ_DIV:
 			TimerClockBaseIndex = TimerClockBaseIndex - 10;
-		elif TimerClockBaseIndex == LJ_tc4MHZ || TimerClockBaseIndex ==  LJ_tc12MHZ || TimerClockBaseIndex == LJ_tc48MHZ || TimerClockBaseIndex == LJ_tc1MHZ_DIV || TimerClockBaseIndex == LJ_tc4MHZ_DIV || TimerClockBaseIndex == LJ_tc12MHZ_DIV || TimerClockBaseIndex == LJ_tc48MHZ_DIV:
+		elif TimerClockBaseIndex == LJ_tc4MHZ or TimerClockBaseIndex ==  LJ_tc12MHZ or TimerClockBaseIndex == LJ_tc48MHZ or TimerClockBaseIndex == LJ_tc1MHZ_DIV or TimerClockBaseIndex == LJ_tc4MHZ_DIV or TimerClockBaseIndex == LJ_tc12MHZ_DIV or TimerClockBaseIndex == LJ_tc48MHZ_DIV:
 			TimerClockBaseIndex = TimerClockBaseIndex - 20;
 		
 		(
@@ -1214,9 +1220,11 @@ class U3(_common):
 		recBuffSize = 0
 		
 		for i in range(2):
-			if aReadTimers[i] || aUpdateResetTimers[i]:
+			if aReadTimers[i] or aUpdateResetTimers[i]:
 				sendBuff[    sendDataBuffSize] = 42 + i * 2                        # Timer
-				sendBuff[1 + sendDataBuffSize] = aUpdateResetTimers[i] ? 1 : 0     # UpdateReset
+				v = 0
+				if aUpdateResetTimers[i]: v = 1
+				sendBuff[1 + sendDataBuffSize] = v                                 # UpdateReset
 				sendBuff[2 + sendDataBuffSize] =  aTimerValues[i] & 0x00ff         # Value LSB
 				sendBuff[3 + sendDataBuffSize] = (aTimerValues[i] & 0xff00) / 256  # Value MSB
 				sendBuffSize += 4
@@ -1224,9 +1232,11 @@ class U3(_common):
 				++numTimers
 		
 		for i in range(2):
-			if aReadCounters[i] || aResetCounters[i]:
+			if aReadCounters[i] or aResetCounters[i]:
 				sendBuff[    sendDataBuffSize] = 54 + i                     # Counter
-				sendBuff[1 + sendDataBuffSize] = aResetCounters[i] ? 1 : 0  # Reset
+				v = 0
+				if aResetCounters[i]: v = 1
+				sendBuff[1 + sendDataBuffSize] = v       # Reset
 				sendBuffSize += 2
 				recBuffSize  += 4
 		
@@ -1242,19 +1252,18 @@ class U3(_common):
 			if aReadTimers[i]:
 				for j in range(4):
 					aTimerValues[i] += recDataBuff[j + dataCountTimer * 4] * pow(2, 8 * j)
-			if aReadTimers[i] || aUpdateResetTimers[i]:
+			if aReadTimers[i] or aUpdateResetTimers[i]:
 				++dataCountTimer
 			
 			aCounterValues[i] = 0
 			if aReadCounters[i]:
 				for j in range(4):
 					aCounterValues[i] += recDataBuff[j + numTimers * 4 + dataCountCounter * 4] * pow(2, 8 * j)
-			if aReadCounters[i] || aResetCounters[i]:
+			if aReadCounters[i] or aResetCounters[i]:
 				++dataCountCounter
 	
 	def ehConfigIO(self, inWriteMask, inTimerCounterConfig, inDAC1Enable, inFIOAnalog, inEIOAnalog):
 		sendBuff = [0] * 12
-		recBuff  = [0[ * 12
 		
 		sendBuff[1] = 0xF8             # command byte
 		sendBuff[2] = 3                # Number of data words
@@ -1334,17 +1343,21 @@ class U3(_common):
 			recBuff[9],  # outTimerClockDivisor
 		)
 	
-	def ehFeedback(self, inIOTypesDataBuff, outDataSize)
+	def ehFeedback(self, inIOTypesDataBuff, outDataSize):
 		ret = 0
 		commandBytes = 6
 		
-		if (sendDWSize = len(inIOTypesDataBuff) + 1) % 2:
+		sendDWSize = len(inIOTypesDataBuff) + 1
+		if sendDWSize % 2:
 			++sendDWSize
-		if ( recDWSize =           outDataSize  + 3) % 2:
+		recDWSize =            outDataSize  + 3
+		if  recDWSize % 2:
 			++ recDWSize
 		
-		sendBuff = [0] * (sendSize = commandBytes + sendDWSize)
-		recBuff  = [0] * ( recSize = commandBytes +  recDWSize)
+		sendSize = commandBytes + sendDWSize
+		sendBuff = [0] * sendSize
+		recSize = commandBytes +  recDWSize
+		recBuff  = [0] *  recSize
 		
 		# Setting up Feedback command
 		sendBuff[1] = 0xF8             # Command byte
@@ -1396,13 +1409,13 @@ class U3_HV(U3):
 		
 		analogVoltage = None
 		
-		if (negChannel >= 0 && negChannel <= 15) || negChannel == 30:
-			if caliInfo.highVoltage == 0 || (caliInfo.highVoltage == 1 && positiveChannel >= 4 && negChannel >= 4):
+		if (negChannel >= 0 and negChannel <= 15) or negChannel == 30:
+			if caliInfo.highVoltage == 0 or (caliInfo.highVoltage == 1 and positiveChannel >= 4 and negChannel >= 4):
 				analogVoltage = caliInfo.ainDiffSlope * bytesVoltage + caliInfo.ainDiffOffset
-			elif caliInfo.hardwareVersion >= 1.3 && caliInfo.highVoltage == 1:
+			elif caliInfo.hardwareVersion >= 1.3 and caliInfo.highVoltage == 1:
 				raise LabJackException(0, "binaryToCalibratedAnalogVoltage error: invalid negative channel for U3-HV.")
 		elif negChannel == 31:
-			if caliInfo->highVoltage == 1 && positiveChannel >= 0 && positiveChannel < 4:
+			if caliInfo.highVoltage == 1 and positiveChannel >= 0 and positiveChannel < 4:
 				analogVoltage = caliInfo.hvAINSlope[positiveChannel] * bytesVoltage + caliInfo.hvAINOffset[positiveChannel]
 			else:
 				analogVoltage = caliInfo.ainSESlope * bytesVoltage + caliInfo.ainSEOffset;
@@ -1412,8 +1425,8 @@ class U3_HV(U3):
 		return analogVoltage
 	
 	def binaryToUncalibratedAnalogVoltage(self, highVoltage, positiveChannel, negChannel, bytesVoltage):
-		if (negChannel >= 0 && negChannel <= 15) or negChannel == 30:
-			if highVoltage == 0 || (highVoltage == 1 && positiveChannel >= 4 && negChannel >= 4):
+		if (negChannel >= 0 and negChannel <= 15) or negChannel == 30:
+			if highVoltage == 0 or (highVoltage == 1 and positiveChannel >= 4 and negChannel >= 4):
 				analogVoltage = bytesVoltage * 0.000074463 - 2.44
 			elif highVoltage == 1:
 				LabJackException(0, "binaryToCalibratedAnalogVoltage_hw130 error: invalid negative channel for U3-HV.")
