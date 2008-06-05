@@ -894,12 +894,12 @@ class U3(_common):
 	def analogToUncalibratedBinary8BitVoltage(self, analogVoltage, safetyRange = True):
 		self._uncali_mult = 51.717
 		self._uncali_max = 255
-		return _common.analogToUncalibratedBinaryVoltage(caliInfo, analogVoltage, safetyRange)
+		return _common.analogToUncalibratedBinaryVoltage(self, caliInfo, analogVoltage, safetyRange)
 	
 	def analogToUncalibratedBinary16BitVoltage(self, analogVoltage, safetyRange = True):
 		self._uncali_mult = 51.717 * 256
 		self._uncali_max = 65535
-		return _common.analogToUncalibratedBinaryVoltage(caliInfo, analogVoltage, safetyRange)
+		return _common.analogToUncalibratedBinaryVoltage(self, caliInfo, analogVoltage, safetyRange)
 	
 	def binaryToUncalibratedAnalogTemperature(self, bytesTemperature):
 		return bytesTemperature * 0.013021
@@ -1002,6 +1002,133 @@ class U3(_common):
 		if hwver < 1.3:
 			return self.binaryToCalibratedAnalogVoltage(CalibrationInfo, DAC1Enable, ChannelN, bytesVT)
 		return self.binaryToCalibratedAnalogVoltage(CalibrationInfo, ChannelP, ChannelN, bytesVT)
+	
+	def eDAC(self, caliInfo, Channel, Voltage, Binary, ConfigIO = False):
+		self.isCalibrationInfoValid(caliInfo)
+		
+		if Channel < 0 or Channel > 1:
+			raise LabJackException(0, "eDAC error: Invalid DAC channel")
+		
+		if ConfigIO and Channel == 1 and caliInfo.hardwareVersion < 1.3:
+			# Using ConfigIO to enable DAC1
+			(
+				__,           # outTimerCounterConfig
+				DAC1Enabled,  # outDAC1Enable
+				__,           # outFIOAnalog
+				__,           # outEIOAnalog
+			) = ehConfigIO(
+				2,            # inWriteMask
+				0,            # inTimerCounterConfig
+				1,            # inDAC1Enable
+				0,            # inFIOAnalog
+				0,            # inEIOAnalog
+			)
+		
+		# Setting up Feedback command to set DAC
+		if caliInfo.hardwareVersion < 1.3:
+			sendSize = 2
+			
+			sendDataBuff[0] = 34 + Channel  # IOType is DAC0/1 (8 bit)
+			
+			sendDataBuff[1] = self.analogToCalibratedBinary8BitVoltage(caliInfo, Channel, Voltage) # Value
+		else:
+			sendSize = 3
+			
+			sendDataBuff[0] = 38 + Channel  # IOType is DAC0/1 (16 bit)
+			
+			bytesV = self.analogToCalibratedBinary16BitVoltage(caliInfo, Channel, Voltage)
+			
+			sendDataBuff[1] = bytesV & 255            # Value LSB
+			sendDataBuff[2] = (bytesV & 65280) / 256  # Value MSB
+		
+		(
+			__,           # outDataBuff
+			__,           # outDataSize
+		) = self.ehFeedback(
+			sendDataBuff, # inIOTypesDataBuff
+			sendSize,     # inIOTypesDataSize
+			0,            # outDataSize
+		)
+	
+	def ehDIO_Feedback(self, channel, newValue = None, ConfigIO = False):
+		if channel < 0 or channel > 19:
+			raise LabJackException(0, "DIO Feedback error: Invalid Channel")
+		
+		sendBuff = [0] * 4
+		if newValue is None:
+			recBuff = [0]
+		else:
+			recBuff = []
+		
+		if ConfigIO and Channel <= 15:
+			FIOAnalog = 255
+			EIOAnalog = 255
+			
+			# Setting Channel to digital using FIOAnalog and EIOAnalog
+			if Channel <= 7:
+				FIOAnalog = 255 - pow(2, Channel)
+			else:
+				EIOAnalog = 255 - pow(2, (Channel - 8))
+			
+			# Using ConfigIO to get current FIOAnalog and EIOAnalog settings
+			(
+				curTCConfig,  # outTimerCounterConfig
+				__,           # outDAC1Enable
+				curFIOAnalog, # outFIOAnalog
+				curEIOAnalog, # outEIOAnalog
+			) = ehConfigIO(
+				0,            # inWriteMask
+				0,            # inTimerCounterConfig
+				0,            # inDAC1Enable
+				0,            # inFIOAnalog
+				0,            # inEIOAnalog
+			)
+			
+			if !(FIOAnalog == curFIOAnalog && EIOAnalog == curEIOAnalog):
+				# Creating new FIOAnalog and EIOAnalog settings
+				# Using ConfigIO to get current FIOAnalog and EIOAnalog settings
+				FIOAnalog = FIOAnalog & curFIOAnalog
+				EIOAnalog = EIOAnalog & curEIOAnalog
+				
+				# Using ConfigIO to set new FIOAnalog and EIOAnalog settings
+				(
+					__,           # outTimerCounterConfig
+					__,           # outDAC1Enable
+					curFIOAnalog, # outFIOAnalog
+					curEIOAnalog, # outEIOAnalog
+				) = ehConfigIO(
+					12,           # inWriteMask
+					curTCConfig,  # inTimerCounterConfig
+					0,            # inDAC1Enable
+					FIOAnalog,    # inFIOAnalog
+					EIOAnalog,    # inEIOAnalog
+				)
+		
+		# Setting up Feedback command to set digital Channel to ( input and to read from it / output and to set the state )
+		sendBuff[0] = 13          # IOType is BitDirWrite
+		sendBuff[1] = Channel     # IONumber(bits 0-4)
+		
+		sendBuff[2] = 10          # IOType is BitStateRead
+		sendBuff[3] = Channel     # IONumber
+		
+		if not newValue is None:
+			sendBuff[1]+= 128     # + Direction (bit 7)
+			sendBuff[2] = 11      # IOType is BitStateWrite
+			if newValue:
+				sendBuff[3]+= 128 # + State (bit 7)
+		
+		(
+			recData,      # outDataBuff
+			__,           # outDataSize
+		) = self.ehFeedback(
+			sendData,     # inIOTypesDataBuff
+			4,            # inIOTypesDataSize
+			len(recData), # outDataSize
+		)
+		
+		if newValue is None:
+			return recData[0]
+		return newValue
 
 class U3_HV(U3):
 	def binaryToCalibratedAnalogVoltage(self, caliInfo, positiveChannel, negChannel, bytesVoltage):
