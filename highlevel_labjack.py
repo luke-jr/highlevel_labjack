@@ -411,59 +411,6 @@ class _common:
 			recBuff[6], # outAINH
 		)
 	
-	def ehDIO_Feedback(self, channel, newValue = None):
-		if channel < 0 or channel > 22:
-			raise LabJackException(0, "DIO Feedback error: Invalid Channel")
-		
-		sendBuff = [0] * 34
-		recBuff  = [0] * 64
-		
-		sendBuff[1] = 0xF8  # command byte
-		sendBuff[2] = 0x0E  # number of data words
-		sendBuff[3] = 0x00  # extended command number
-		
-		tempOffset = 6 + ((channel / 8) * 3)
-		tempByte = pow(2, channel % 8)
-		sendBuff[tempOffset] = tempByte
-		rvidx = {
-			 6:  7,
-			 9:  9,
-			12: 10,
-			14: 11,
-		}[tempOffset]
-		
-		if not newValue is None:
-			sendBuff[tempOffset + 1] = tempByte
-			if newValue:
-				sendBuff[tempOffset + 2] = tempByte
-		
-		self.extendedChecksum(sendBuff)
-		
-		# Sending command to UE9
-		self._LJP.Write(self._LJ, sendBuff, 34)
-		
-		# Reading response from UE9
-		(recChars, recBuff) = self._LJP.Read(self._LJ, False, 64);
-		if recChars == 0:
-			raise LabJackException(0, "DIO Feedback error : read failed")
-		if recChars < 64:
-			raise LabJackException(0, "DIO Feedback error : did not read all of the buffer")
-		
-		checksumTotal = self.extendedChecksum16(recBuff)
-		if (checksumTotal / 256) & 0xff != recBuff[5]:
-			raise LabJackException(0, "DIO Feedback error : read buffer has bad checksum16(MSB)")
-		
-		if checksumTotal & 0xff != recBuff[4]:
-			raise LabJackException(0, "DIO Feedback error : read buffer has bad checksum16(LBS)")
-		
-		if self.extendedChecksum8(recBuff) != recBuff[0]:
-			raise LabJackException(0, "DIO Feedback error : read buffer has bad checksum8")
-		
-		if recBuff[1] != 0xF8 or recBuff[2] != 0x1D or recBuff[3] != 0x00:
-			raise LabJackException(0, "DIO Feedback error : read buffer has wrong command bytes")
-		
-		return recBuff[rvidx] & tempByte
-	
 	def ehTimerCounter(self, inTimerClockDivisor, inEnableMask, inTimerClockBase, inUpdateReset, inTimerMode, inTimerValue, inCounterMode, outTimer, outCounter):
 		sendBuff = [0] * 30
 		recBuff  = [0] * 40
@@ -728,6 +675,59 @@ class UE9(common):
 			(bytesVoltage / 256) + 192,
 			0,
 		)
+	
+	def ehDIO_Feedback(self, channel, newValue = None):
+		if channel < 0 or channel > 22:
+			raise LabJackException(0, "DIO Feedback error: Invalid Channel")
+		
+		sendBuff = [0] * 34
+		recBuff  = [0] * 64
+		
+		sendBuff[1] = 0xF8  # command byte
+		sendBuff[2] = 0x0E  # number of data words
+		sendBuff[3] = 0x00  # extended command number
+		
+		tempOffset = 6 + ((channel / 8) * 3)
+		tempByte = pow(2, channel % 8)
+		sendBuff[tempOffset] = tempByte
+		rvidx = {
+			 6:  7,
+			 9:  9,
+			12: 10,
+			14: 11,
+		}[tempOffset]
+		
+		if not newValue is None:
+			sendBuff[tempOffset + 1] = tempByte
+			if newValue:
+				sendBuff[tempOffset + 2] = tempByte
+		
+		self.extendedChecksum(sendBuff)
+		
+		# Sending command to UE9
+		self._LJP.Write(self._LJ, sendBuff, 34)
+		
+		# Reading response from UE9
+		(recChars, recBuff) = self._LJP.Read(self._LJ, False, 64);
+		if recChars == 0:
+			raise LabJackException(0, "DIO Feedback error : read failed")
+		if recChars < 64:
+			raise LabJackException(0, "DIO Feedback error : did not read all of the buffer")
+		
+		checksumTotal = self.extendedChecksum16(recBuff)
+		if (checksumTotal / 256) & 0xff != recBuff[5]:
+			raise LabJackException(0, "DIO Feedback error : read buffer has bad checksum16(MSB)")
+		
+		if checksumTotal & 0xff != recBuff[4]:
+			raise LabJackException(0, "DIO Feedback error : read buffer has bad checksum16(LBS)")
+		
+		if self.extendedChecksum8(recBuff) != recBuff[0]:
+			raise LabJackException(0, "DIO Feedback error : read buffer has bad checksum8")
+		
+		if recBuff[1] != 0xF8 or recBuff[2] != 0x1D or recBuff[3] != 0x00:
+			raise LabJackException(0, "DIO Feedback error : read buffer has wrong command bytes")
+		
+		return recBuff[rvidx] & tempByte
 
 class U3(_common):
 	prodID = 3
