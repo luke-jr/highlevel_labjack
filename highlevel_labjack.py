@@ -306,7 +306,7 @@ class UE9:
 			pass
 		elif powerLevel == 0:
 			slope = caliInfo.tempSlope
-		elif powerLevel == 1:
+		elif powerLevel == 1 and not caliInfo.tempSlopeLow is None:
 			slope = caliInfo.tempSlopeLow
 		else:
 			raise LabJackException(0, "binaryToCalibratedAnalogTemperatureK error: invalid powerLevel")
@@ -344,8 +344,10 @@ class UE9:
 		
 		return (slope * bytesVoltage) + offset
 	
+	_uncali_mult = 842.59
+	_uncali_max = 4095
 	def analogToUncalibratedBinaryVoltage(self, analogVoltage, safetyRange = True):
-		tempBytesVoltage = 842.59 * analogVoltage
+		tempBytesVoltage = _uncali_mult * analogVoltage
 		
 		if not safetyRange:
 			return tempBytesVoltage
@@ -356,8 +358,8 @@ class UE9:
 		# value not between 0 and 4095.
 		if tempBytesVoltage < 0:
 			tempBytesVoltage = 0
-		if tempBytesVoltage > 4095:
-			tempBytesVoltage = 4095
+		if tempBytesVoltage > _uncali_max:
+			tempBytesVoltage = _uncali_max
 		
 		return tempBytesVoltage
 	
@@ -867,6 +869,38 @@ class U3(UE9):
 			tempBytesVoltage = 255
 		
 		return tempBytesVoltage
+	
+	def binaryToUncalibratedAnalogVoltage(self, dac1Enabled, negChannel, bytesVoltage):
+		if (negChannel >= 0 && negChannel <= 15) or negChannel == 30:
+			if dac1Enabled == 0:
+				analogVoltage = bytesVoltage * 0.000074463 - 2.44
+			else:
+				analogVoltage = bytesVoltage / 65536. * 6.6 - 3.3
+		elif negChannel == 31:
+			if dac1Enabled == 0:
+				analogVoltage = bytesVoltage * 0.000037231
+			else:
+				analogVoltage = bytesVoltage / 65536. * 3.3
+		else:
+			raise LabJackException(0, "binaryToCalibratedAnalogVoltage error: invalid negative channel.")
+		
+		return analogVoltage
+	
+	def analogToUncalibratedBinaryVoltage(self, analogVoltage, safetyRange = True):
+		return self.analogToUncalibratedBinary8BitVoltage(caliInfo, analogVoltage, safetyRange)
+	
+	def analogToUncalibratedBinary8BitVoltage(self, analogVoltage, safetyRange = True):
+		self._uncali_mult = 51.717
+		self._uncali_max = 255
+		return UE9.analogToUncalibratedBinaryVoltage(caliInfo, analogVoltage, safetyRange)
+	
+	def analogToUncalibratedBinary16BitVoltage(self, analogVoltage, safetyRange = True):
+		self._uncali_mult = 51.717 * 256
+		self._uncali_max = 65535
+		return UE9.analogToUncalibratedBinaryVoltage(caliInfo, analogVoltage, safetyRange)
+	
+	def binaryToUncalibratedAnalogTemperature(self, bytesTemperature):
+		return bytesTemperature * 0.013021
 
 class U3_HV(U3):
 	def binaryToCalibratedAnalogVoltage(self, caliInfo, positiveChannel, negChannel, bytesVoltage):
@@ -889,6 +923,22 @@ class U3_HV(U3):
 				analogVoltage = caliInfo.ainSESlope * bytesVoltage + caliInfo.ainSEOffset;
 		else:
 			raise LabJackException(0, "binaryToCalibratedAnalogVoltage error: invalid negative channel.")
+		
+		return analogVoltage
+	
+	def binaryToUncalibratedAnalogVoltage(self, highVoltage, positiveChannel, negChannel, bytesVoltage):
+		if (negChannel >= 0 && negChannel <= 15) or negChannel == 30:
+			if highVoltage == 0 || (highVoltage == 1 && positiveChannel >= 4 && negChannel >= 4):
+				analogVoltage = bytesVoltage * 0.000074463 - 2.44
+			elif highVoltage == 1:
+				LabJackException(0, "binaryToCalibratedAnalogVoltage_hw130 error: invalid negative channel for U3-HV.")
+		elif negChannel == 31:
+			if highVoltage == 1:
+				analogVoltage = bytesVoltage * 0.000314 - 10.3
+			else:
+				analogVoltage = bytesVoltage * 0.000037231
+		else:
+			LabJackException(0, "binaryToCalibratedAnalogVoltage_hw130 error: invalid negative channel.")
 		
 		return analogVoltage
 
