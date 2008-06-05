@@ -751,9 +751,9 @@ class U3(_common):
 		cU3SendBuffer[2] = 0x0A  # number of data words
 		cU3SendBuffer[3] = 0x08  # extended command number
 		
-		extendedChecksum(cU3SendBuffer, 26)
+		self.extendedChecksum(cU3SendBuffer)
 		
-		self._LJP.Write(self._LJ, U3_PIPE_EP1_OUT, sendBuffer, 26)
+		self._LJP.Write(self._LJ, sendBuffer, 26)
 		
 		(sentRec, cU3RecBuffer) = self._LJP.Read(self._LJ, False, 38)
 		if sentRec < 38:
