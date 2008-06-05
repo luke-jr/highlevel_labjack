@@ -807,6 +807,32 @@ class U3(UE9):
 		caliInfo.prodID = self.prodID
 		
 		return caliInfo
+	
+	# NOTE: order of negChannel and dacEnabled reversed to match UE9 to some extent
+	def binaryToCalibratedAnalogVoltage(self, caliInfo, negChannel, dacEnabled, bytesVoltage):
+		self.isCalibrationInfoValid(caliInfo)
+		
+		analogVoltage = None
+		if caliInfo.hardwareVersion >= 1.3:
+			if caliInfo.highVoltage == 1:
+				raise LabJackException(0, "binaryToCalibratedAnalogVoltage error: cannot handle U3-HV device.  Please use binaryToCalibratedAnalogVoltage_hw130 function.")
+			else:
+				return binaryToCalibratedAnalogVoltage_hw130(caliInfo, 0, negChannel, bytesVoltage, analogVoltage)
+		
+		if (negChannel >= 0 && negChannel <= 15) || negChannel == 30:
+			if dacEnabled == 0:
+				analogVoltage = caliInfo.ainDiffSlope * bytesVoltage + caliInfo.ainDiffOffset
+			else:
+				analogVoltage = (bytesVoltage / 65536.) * caliInfo.vreg * 2. - caliInfo.vreg
+		elif negChannel == 31:
+			if dacEnabled == 0:
+				analogVoltage = caliInfo.ainSESlope * bytesVoltage + caliInfo.ainSEOffset
+			else:
+				analogVoltage = (bytesVoltage / 65536.) * caliInfo.vreg
+		else:
+			raise LabJackException(0, "binaryToCalibratedAnalogVoltage error: invalid negative channel.")
+		
+		return analogVoltage
 
 """
 x=UE9(LabJackPython.LJ_ctETHERNET, "192.168.1.209")
