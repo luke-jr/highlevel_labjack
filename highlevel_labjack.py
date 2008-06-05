@@ -1304,6 +1304,43 @@ class U3(_common):
 			recBuff[10], # outFIOAnalog
 			recBuff[11], # outEIOAnalog
 		)
+	
+	def ehConfigTimerClock(self, inTimerClockConfig, inTimerClockDivisor):
+		sendBuff = [0] * 10
+		recSize = 10
+		
+		sendBuff[1] = 0xF8                 # Command byte
+		sendBuff[2] = 2                    # Number of data words
+		sendBuff[3] = 0x0A                 # Extended command number
+		
+		sendBuff[8] = inTimerClockConfig   # TimerClockConfig
+		sendBuff[9] = inTimerClockDivisor  # TimerClockDivisor
+		self.extendedChecksum(sendBuff)
+		
+		# Sending command to U3
+		self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
+		
+		# Reading response from U3
+		(recChars, recBuff) = self._LJP.Read(self._LJ, recSize);
+		if recChars < recSize:
+			if recChars == 0:
+				raise LabJackException(0, "ehConfigTimerClock : read failed")
+			else:
+				raise LabJackException(0, "ehConfigTimerClock : did not read all of the buffer")
+		
+		chksum = (recBuff[0], recBuff[4], recBuff[5])
+		self.extendedChecksum(recBuff)
+		if chksum != (recBuff[0], recBuff[4], recBuff[5]):
+			raise Exception(0, "Read buffer has bad checksum")
+		if recBuff[1] != 0xF8 or recBuff[2] != 2 or recBuff[3] != 0x0A:
+			raise Exception(0, "Read buffer has wrong command bytes")
+		if recBuff[6]:
+			raise Exception(0, "Read buffer received errorcode %d" % recBuff[6])
+		
+		return (
+			recBuff[8],  # outTimerClockConfig
+			recBuff[9],  # outTimerClockDivisor
+		)
 
 class U3_HV(U3):
 	def binaryToCalibratedAnalogVoltage(self, caliInfo, positiveChannel, negChannel, bytesVoltage):
