@@ -753,7 +753,7 @@ class U3(_common):
 		
 		self.extendedChecksum(cU3SendBuffer)
 		
-		self._LJP.Write(self._LJ, sendBuffer, 26)
+		self._LJP.Write(self._LJ, cU3SendBuffer, 26)
 		
 		(sentRec, cU3RecBuffer) = self._LJP.Read(self._LJ, False, 38)
 		if sentRec < 38:
