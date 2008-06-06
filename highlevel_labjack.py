@@ -791,26 +791,26 @@ class U3(_common):
 			recBuffers.append(recBuffer)
 		
 		# block data starts on byte 8 of the buffer
-		caliInfo.ainSESlope    = self.FPuint8ArrayToFPDouble(recBuffers[0],   0)
-		caliInfo.ainSEOffset   = self.FPuint8ArrayToFPDouble(recBuffers[0],   8)
-		caliInfo.ainDiffSlope  = self.FPuint8ArrayToFPDouble(recBuffers[0],  16)
-		caliInfo.ainDiffOffset = self.FPuint8ArrayToFPDouble(recBuffers[0],  24)
+		caliInfo.ainSESlope    = self.FPuint8ArrayToFPDouble(recBuffers[0],   8)
+		caliInfo.ainSEOffset   = self.FPuint8ArrayToFPDouble(recBuffers[0],  16)
+		caliInfo.ainDiffSlope  = self.FPuint8ArrayToFPDouble(recBuffers[0],  24)
+		caliInfo.ainDiffOffset = self.FPuint8ArrayToFPDouble(recBuffers[0],  32)
 		
 		caliInfo.DACSlope [0]  = self.FPuint8ArrayToFPDouble(recBuffers[1],   8)
 		caliInfo.DACOffset[0]  = self.FPuint8ArrayToFPDouble(recBuffers[1],  16)
 		caliInfo.DACSlope [1]  = self.FPuint8ArrayToFPDouble(recBuffers[1],  24)
 		caliInfo.DACOffset[1]  = self.FPuint8ArrayToFPDouble(recBuffers[1],  32)
 		
-		caliInfo.tempSlope     = self.FPuint8ArrayToFPDouble(recBuffers[2],   0)
-		caliInfo.Vref          = self.FPuint8ArrayToFPDouble(recBuffers[2],   8)
-		caliInfo.Vref15        = self.FPuint8ArrayToFPDouble(recBuffers[2],  16)
-		caliInfo.Vreg          = self.FPuint8ArrayToFPDouble(recBuffers[2],  24)
+		caliInfo.tempSlope     = self.FPuint8ArrayToFPDouble(recBuffers[2],   8)
+		caliInfo.Vref          = self.FPuint8ArrayToFPDouble(recBuffers[2],  16)
+		caliInfo.Vref15        = self.FPuint8ArrayToFPDouble(recBuffers[2],  24)
+		caliInfo.Vreg          = self.FPuint8ArrayToFPDouble(recBuffers[2],  32)
 		
 		for i in range(4):
-			caliInfo.hvAINSlope[i] = self.FPuint8ArrayToFPDouble(recBuffers[3],  i * 8)
+			caliInfo.hvAINSlope[i] = self.FPuint8ArrayToFPDouble(recBuffers[3],  (i + 1) * 8)
 		
 		for i in range(4):
-			caliInfo.hvAINOffset[i] = self.FPuint8ArrayToFPDouble(recBuffers[4],  i * 8)
+			caliInfo.hvAINOffset[i] = self.FPuint8ArrayToFPDouble(recBuffers[4],  (i + 1) * 8)
 		
 		caliInfo.prodID = self.prodID
 		
