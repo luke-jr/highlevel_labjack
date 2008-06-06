@@ -945,7 +945,7 @@ class U3(_common):
 			# Using ConfigIO to get current FIOAnalog and EIOAnalog settings
 			(
 				curTCConfig,   # outTimerCounterConfig
-				outDAC1Enalbe, # outDAC1Enable
+				outDAC1Enable, # outDAC1Enable
 				curFIOAnalog,  # outFIOAnalog
 				curEIOAnalog,  # outEIOAnalog
 			) = self.ehConfigIO(
