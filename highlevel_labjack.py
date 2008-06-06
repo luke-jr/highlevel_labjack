@@ -1347,7 +1347,8 @@ class U3(_common):
 		ret = 0
 		commandBytes = 6
 		
-		sendDWSize = len(inIOTypesDataBuff) + 1
+		inIOTypesDataSize = len(inIOTypesDataBuff)
+		sendDWSize = inIOTypesDataSize + 1
 		if sendDWSize % 2:
 			++sendDWSize
 		recDWSize =            outDataSize  + 3
