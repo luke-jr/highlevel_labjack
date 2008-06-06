@@ -919,6 +919,7 @@ class U3(_common):
 		if ChannelP < 0 or (ChannelP > 15 and ChannelP != 30 and ChannelP != 31):
 			raise LabJackException(0, "eAIN error: Invalid positive channel")
 		
+		if ChannelN is None: ChannelN = 31
 		if ChannelN < 0 or (ChannelN > 15 and ChannelN != 30 and ChannelN != 31) or (hwver >= 1.3 and hv == 1 and ((ChannelP < 4 and ChannelN != 31) or ChannelN < 4)):
 			raise LabJackException(0, "eAIN error: Invalid negative channel")
 		
