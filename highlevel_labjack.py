@@ -246,10 +246,10 @@ class _common:
 		NumI2CBytesToSend = len(I2CBytesCommand)
 		sendSize = 6 + 8 + NumI2CBytesToSend
 		if sendSize % 2 != 0:
-			++sendSize
+			sendSize += 1
 		recSize  = 6 + 6 + NumI2CBytesToReceive
 		if  recSize % 2 != 0:
-			++ recSize
+			recSize += 1
 		
 		sendBuff = [0] * sendSize
 		recBuff  = [0] *  recSize
@@ -596,7 +596,7 @@ class UE9(_common):
 		
 		for i in range(6):
 			if aEnableTimers[i] != 0 and numTimersStop == 0:
-				++numTimers
+				numTimers += 1
 				timerMode [i] = aTimerModes [i]  # TimerMode
 				timerValue[i] = aTimerValues[i]  # TimerValue
 			else:
@@ -1161,13 +1161,13 @@ class U3(_common):
 		
 		for i in range(2):
 			if aEnableTimers[i]:
-				++numTimers
+				numTimers += 1
 			else:
 				break
 		
 		for i in range(2):
 			if aEnableCounters[i]:
-				++numCounters
+				numCounters += 1
 				TimerCounterConfig += pow(2, i + 2)
 		
 		TimerCounterConfig += numTimers + TCPinOffset * 16
@@ -1229,7 +1229,7 @@ class U3(_common):
 				sendBuff[3 + sendDataBuffSize] = (aTimerValues[i] & 0xff00) / 256  # Value MSB
 				sendBuffSize += 4
 				recBuffSize  += 4
-				++numTimers
+				numTimers += 1
 		
 		for i in range(2):
 			if aReadCounters[i] or aResetCounters[i]:
@@ -1253,14 +1253,14 @@ class U3(_common):
 				for j in range(4):
 					aTimerValues[i] += recDataBuff[j + dataCountTimer * 4] * pow(2, 8 * j)
 			if aReadTimers[i] or aUpdateResetTimers[i]:
-				++dataCountTimer
+				dataCountTimer += 1
 			
 			aCounterValues[i] = 0
 			if aReadCounters[i]:
 				for j in range(4):
 					aCounterValues[i] += recDataBuff[j + numTimers * 4 + dataCountCounter * 4] * pow(2, 8 * j)
 			if aReadCounters[i] or aResetCounters[i]:
-				++dataCountCounter
+				dataCountCounter += 1
 	
 	def ehConfigIO(self, inWriteMask, inTimerCounterConfig, inDAC1Enable, inFIOAnalog, inEIOAnalog):
 		sendBuff = [0] * 12
@@ -1350,10 +1350,10 @@ class U3(_common):
 		inIOTypesDataSize = len(inIOTypesDataBuff)
 		sendDWSize = inIOTypesDataSize + 1
 		if sendDWSize % 2:
-			++sendDWSize
+			sendDWSize += 1
 		recDWSize =            outDataSize  + 3
 		if  recDWSize % 2:
-			++ recDWSize
+			recDWSize += 1
 		
 		sendSize = commandBytes + sendDWSize
 		sendBuff = [0] * sendSize
