@@ -923,6 +923,7 @@ class U3(_common):
 		if ChannelN < 0 or (ChannelN > 15 and ChannelN != 30 and ChannelN != 31) or (hwver >= 1.3 and hv == 1 and ((ChannelP < 4 and ChannelN != 31) or ChannelN < 4)):
 			raise LabJackException(0, "eAIN error: Invalid negative channel")
 		
+		DAC1Enable = False # ??? FIXME
 		if hwver >= 1.3 and hv == 1 and ChannelP < 4:
 			pass
 		elif ConfigIO:
