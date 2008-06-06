@@ -277,7 +277,7 @@ class _common:
 		self._LJP.Write(self._LJ, sendBuff, sendSize)
 		
 		# Reading response from UE9
-		(recChars, recBuff) = self._LJP.Read(self._LJ, recSize);
+		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
 		if recChars < recSize:
 			if recChars == 0:
 				raise LabJackException(0, "I2C Error : read failed")
@@ -1322,7 +1322,7 @@ class U3(_common):
 		self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
 		
 		# Reading response from U3
-		(recChars, recBuff) = self._LJP.Read(self._LJ, recSize);
+		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
 		if recChars < recSize:
 			if recChars == 0:
 				raise LabJackException(0, "ehConfigTimerClock : read failed")
@@ -1375,7 +1375,7 @@ class U3(_common):
 		self._LJP.Write(self._LJ, sendBuff, sendSize)
 		
 		# Reading response from U3
-		(recChars, recBuff) = self._LJP.Read(self._LJ, recSize);
+		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
 		if recChars < recSize:
 			if recChars == 0:
 				raise LabJackException(0, "ehFeedback : read failed")
