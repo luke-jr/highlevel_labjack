@@ -907,7 +907,7 @@ class U3(_common):
 	
 	#TODO: new output DAC1Enable
 	# NOTE: moved ConfigIO param to the end optional for UE9 compat
-	def eAIN(self, ChannelP, ChannelN, Range, Resolution, inSettling, Binary, caliInfo = True, ConfigIO = False):
+	def eAIN(self, ChannelP, ChannelN, Range, Resolution, inSettling, Binary, caliInfo = True, ConfigIO = True):
 		if caliInfo is True:
 			caliInfo = self.caliInfo
 		
@@ -1005,7 +1005,7 @@ class U3(_common):
 			return self.binaryToCalibratedAnalogVoltage(caliInfo, DAC1Enable, ChannelN, bytesVT)
 		return self.binaryToCalibratedAnalogVoltage(caliInfo, ChannelP, ChannelN, bytesVT)
 	
-	def eDAC(self, caliInfo, Channel, Voltage, Binary, ConfigIO = False):
+	def eDAC(self, caliInfo, Channel, Voltage, Binary, ConfigIO = True):
 		self.isCalibrationInfoValid(caliInfo)
 		
 		if Channel < 0 or Channel > 1:
@@ -1048,7 +1048,7 @@ class U3(_common):
 			0,            # outDataSize
 		)
 	
-	def ehDIO_Feedback(self, channel, newValue = None, ConfigIO = False):
+	def ehDIO_Feedback(self, channel, newValue = None, ConfigIO = True):
 		if channel < 0 or channel > 19:
 			raise LabJackException(0, "DIO Feedback error: Invalid Channel")
 		
