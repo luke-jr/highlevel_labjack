@@ -595,7 +595,7 @@ class UE9(_common):
 		numTimersStop = 0
 		
 		for i in range(6):
-			if aEnableTimers[i] != 0 and numTimersStop == 0:
+			if aEnableTimers[i] and not numTimersStop:
 				numTimers += 1
 				timerMode [i] = aTimerModes [i]  # TimerMode
 				timerValue[i] = aTimerValues[i]  # TimerValue
@@ -617,11 +617,11 @@ class UE9(_common):
 		# UpdateReset
 		updateReset = 0
 		for i in range(6):
-			if aUpdateResetTimers[i] != 0:
+			if aUpdateResetTimers[i]:
 				updateReset += pow(2, i)
 		
 		for i in range(2):
-			if aResetCounters[i] != 0:
+			if aResetCounters[i]:
 				updateReset += pow(2, 6 + i)
 		
 		return self.ehTimerCounter(0, 0, 0, updateReset, timerMode, timerValue, counterMode, True, True)
@@ -827,12 +827,12 @@ class U3(_common):
 				return binaryToCalibratedAnalogVoltage_hw130(caliInfo, 0, negChannel, bytesVoltage, analogVoltage)
 		
 		if (negChannel >= 0 and negChannel <= 15) or negChannel == 30:
-			if dacEnabled == 0:
+			if not dacEnabled:
 				analogVoltage = caliInfo.ainDiffSlope * bytesVoltage + caliInfo.ainDiffOffset
 			else:
 				analogVoltage = (bytesVoltage / 65536.) * caliInfo.vreg * 2. - caliInfo.vreg
 		elif negChannel == 31:
-			if dacEnabled == 0:
+			if not dacEnabled:
 				analogVoltage = caliInfo.ainSESlope * bytesVoltage + caliInfo.ainSEOffset
 			else:
 				analogVoltage = (bytesVoltage / 65536.) * caliInfo.vreg
@@ -875,12 +875,12 @@ class U3(_common):
 	
 	def binaryToUncalibratedAnalogVoltage(self, dac1Enabled, negChannel, bytesVoltage):
 		if (negChannel >= 0 and negChannel <= 15) or negChannel == 30:
-			if dac1Enabled == 0:
+			if not dac1Enabled:
 				analogVoltage = bytesVoltage * 0.000074463 - 2.44
 			else:
 				analogVoltage = bytesVoltage / 65536. * 6.6 - 3.3
 		elif negChannel == 31:
-			if dac1Enabled == 0:
+			if not dac1Enabled:
 				analogVoltage = bytesVoltage * 0.000037231
 			else:
 				analogVoltage = bytesVoltage / 65536. * 3.3
@@ -1411,7 +1411,7 @@ class U3_HV(U3):
 		analogVoltage = None
 		
 		if (negChannel >= 0 and negChannel <= 15) or negChannel == 30:
-			if caliInfo.highVoltage == 0 or (caliInfo.highVoltage == 1 and positiveChannel >= 4 and negChannel >= 4):
+			if (not caliInfo.highVoltage) or (caliInfo.highVoltage == 1 and positiveChannel >= 4 and negChannel >= 4):
 				analogVoltage = caliInfo.ainDiffSlope * bytesVoltage + caliInfo.ainDiffOffset
 			elif caliInfo.hardwareVersion >= 1.3 and caliInfo.highVoltage == 1:
 				raise LabJackException(0, "binaryToCalibratedAnalogVoltage error: invalid negative channel for U3-HV.")
@@ -1427,7 +1427,7 @@ class U3_HV(U3):
 	
 	def binaryToUncalibratedAnalogVoltage(self, highVoltage, positiveChannel, negChannel, bytesVoltage):
 		if (negChannel >= 0 and negChannel <= 15) or negChannel == 30:
-			if highVoltage == 0 or (highVoltage == 1 and positiveChannel >= 4 and negChannel >= 4):
+			if (not highVoltage) or (highVoltage == 1 and positiveChannel >= 4 and negChannel >= 4):
 				analogVoltage = bytesVoltage * 0.000074463 - 2.44
 			elif highVoltage == 1:
 				LabJackException(0, "binaryToCalibratedAnalogVoltage_hw130 error: invalid negative channel for U3-HV.")
