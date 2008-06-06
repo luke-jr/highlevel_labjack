@@ -1002,8 +1002,8 @@ class U3(_common):
 		if ChannelP == 30:
 			return self.binaryToCalibratedAnalogTemperature(caliInfo, bytesVT)
 		if hwver < 1.3:
-			return self.binaryToCalibratedAnalogVoltage(CalibrationInfo, DAC1Enable, ChannelN, bytesVT)
-		return self.binaryToCalibratedAnalogVoltage(CalibrationInfo, ChannelP, ChannelN, bytesVT)
+			return self.binaryToCalibratedAnalogVoltage(caliInfo, DAC1Enable, ChannelN, bytesVT)
+		return self.binaryToCalibratedAnalogVoltage(caliInfo, ChannelP, ChannelN, bytesVT)
 	
 	def eDAC(self, caliInfo, Channel, Voltage, Binary, ConfigIO = False):
 		self.isCalibrationInfoValid(caliInfo)
