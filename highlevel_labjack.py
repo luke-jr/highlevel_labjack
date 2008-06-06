@@ -911,7 +911,7 @@ class U3(_common):
 		if caliInfo is True:
 			caliInfo = self.caliInfo
 		
-		isCalibrationInfoValid(caliInfo)
+		self.isCalibrationInfoValid(caliInfo)
 		
 		hwver = caliInfo.hardwareVersion
 		hv = caliInfo.highVoltage
