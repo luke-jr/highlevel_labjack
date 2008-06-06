@@ -969,7 +969,7 @@ class U3(_common):
 					__,           # outDAC1Enable
 					curFIOAnalog, # outFIOAnalog
 					curEIOAnalog, # outEIOAnalog
-				) = ehConfigIO(
+				) = self.ehConfigIO(
 					12,           # inWriteMask
 					curTCConfig,  # inTimerCounterConfig
 					0,            # inDAC1Enable
@@ -1018,7 +1018,7 @@ class U3(_common):
 				DAC1Enabled,  # outDAC1Enable
 				__,           # outFIOAnalog
 				__,           # outEIOAnalog
-			) = ehConfigIO(
+			) = self.ehConfigIO(
 				2,            # inWriteMask
 				0,            # inTimerCounterConfig
 				1,            # inDAC1Enable
@@ -1070,7 +1070,7 @@ class U3(_common):
 				__,           # outDAC1Enable
 				curFIOAnalog, # outFIOAnalog
 				curEIOAnalog, # outEIOAnalog
-			) = ehConfigIO(
+			) = self.ehConfigIO(
 				0,            # inWriteMask
 				0,            # inTimerCounterConfig
 				0,            # inDAC1Enable
@@ -1090,7 +1090,7 @@ class U3(_common):
 					__,           # outDAC1Enable
 					curFIOAnalog, # outFIOAnalog
 					curEIOAnalog, # outEIOAnalog
-				) = ehConfigIO(
+				) = self.ehConfigIO(
 					12,           # inWriteMask
 					curTCConfig,  # inTimerCounterConfig
 					0,            # inDAC1Enable
@@ -1146,7 +1146,7 @@ class U3(_common):
 			__,           # outDAC1Enable
 			curFIOAnalog, # outFIOAnalog
 			curEIOAnalog, # outEIOAnalog
-		) = ehConfigIO(
+		) = self.ehConfigIO(
 			0,            # inWriteMask
 			0,            # inTimerCounterConfig
 			0,            # inDAC1Enable
@@ -1186,7 +1186,7 @@ class U3(_common):
 			__,                    # outDAC1Enable
 			curFIOAnalog,          # outFIOAnalog
 			curEIOAnalog,          # outEIOAnalog
-		) = ehConfigIO(
+		) = self.ehConfigIO(
 			13,                    # inWriteMask
 			TimerCounterConfig,    # inTimerCounterConfig
 			0,                     # inDAC1Enable
