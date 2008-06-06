@@ -1358,7 +1358,6 @@ class U3(_common):
 		sendSize = commandBytes + sendDWSize
 		sendBuff = [0] * sendSize
 		recSize = commandBytes +  recDWSize
-		recBuff  = [0] *  recSize
 		
 		# Setting up Feedback command
 		sendBuff[1] = 0xF8             # Command byte
