@@ -1048,8 +1048,8 @@ class U3(_common):
 			0,            # outDataSize
 		)
 	
-	def ehDIO_Feedback(self, channel, newValue = None, ConfigIO = True):
-		if channel < 0 or channel > 19:
+	def ehDIO_Feedback(self, Channel, newValue = None, ConfigIO = True):
+		if Channel < 0 or Channel > 19:
 			raise LabJackException(0, "DIO Feedback error: Invalid Channel")
 		
 		sendBuff = [0] * 4
