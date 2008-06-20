@@ -547,9 +547,14 @@ class UE9(_common):
 		}[tempOffset]
 		
 		if not newValue is None:
+		  if channel < 16:
 			sendBuff[tempOffset + 1] = tempByte
 			if newValue:
 				sendBuff[tempOffset + 2] = tempByte
+		  else:
+			sendBuff[tempOffset + 1] = tempByte << 4
+			if newValue:
+				sendBuff[tempOffset + 1] += tempByte
 		
 		self.extendedChecksum(sendBuff)
 		
