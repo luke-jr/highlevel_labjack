@@ -1227,22 +1227,22 @@ class U3(_common):
 		
 		for i in range(2):
 			if aReadTimers[i] or aUpdateResetTimers[i]:
-				sendBuff[    sendDataBuffSize] = 42 + i * 2                        # Timer
+				sendBuff[    sendBuffSize] = 42 + i * 2                        # Timer
 				v = 0
 				if aUpdateResetTimers[i]: v = 1
-				sendBuff[1 + sendDataBuffSize] = v                                 # UpdateReset
-				sendBuff[2 + sendDataBuffSize] =  aTimerValues[i] & 0x00ff         # Value LSB
-				sendBuff[3 + sendDataBuffSize] = (aTimerValues[i] & 0xff00) / 256  # Value MSB
+				sendBuff[1 + sendBuffSize] = v                                 # UpdateReset
+				sendBuff[2 + sendBuffSize] =  aTimerValues[i] & 0x00ff         # Value LSB
+				sendBuff[3 + sendBuffSize] = (aTimerValues[i] & 0xff00) / 256  # Value MSB
 				sendBuffSize += 4
 				recBuffSize  += 4
 				numTimers += 1
 		
 		for i in range(2):
 			if aReadCounters[i] or aResetCounters[i]:
-				sendBuff[    sendDataBuffSize] = 54 + i                     # Counter
+				sendBuff[    sendBuffSize] = 54 + i                     # Counter
 				v = 0
 				if aResetCounters[i]: v = 1
-				sendBuff[1 + sendDataBuffSize] = v       # Reset
+				sendBuff[1 + sendBuffSize] = v       # Reset
 				sendBuffSize += 2
 				recBuffSize  += 4
 		
