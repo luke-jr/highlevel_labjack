@@ -1253,20 +1253,22 @@ class U3(_common):
 			recBuffSize,  # outDataSize
 		)
 		
+		aTimerValues = [0] * 2
+		aCounterValues = [0] * 2
 		for i in range(2):
-			aTimerValues[i] = 0
 			if aReadTimers[i]:
 				for j in range(4):
 					aTimerValues[i] += recDataBuff[j + dataCountTimer * 4] * pow(2, 8 * j)
 			if aReadTimers[i] or aUpdateResetTimers[i]:
 				dataCountTimer += 1
 			
-			aCounterValues[i] = 0
 			if aReadCounters[i]:
 				for j in range(4):
 					aCounterValues[i] += recDataBuff[j + numTimers * 4 + dataCountCounter * 4] * pow(2, 8 * j)
 			if aReadCounters[i] or aResetCounters[i]:
 				dataCountCounter += 1
+		
+		return (aTimerValues, aCounterValues)
 	
 	def ehConfigIO(self, inWriteMask, inTimerCounterConfig, inDAC1Enable, inFIOAnalog, inEIOAnalog):
 		sendBuff = [0] * 12
