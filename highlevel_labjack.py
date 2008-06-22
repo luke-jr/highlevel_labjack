@@ -1258,13 +1258,13 @@ class U3(_common):
 		for i in range(2):
 			if aReadTimers[i]:
 				for j in range(4):
-					aTimerValues[i] += recDataBuff[j + dataCountTimer * 4] * pow(2, 8 * j)
+					aTimerValues[i] += recBuff[j + dataCountTimer * 4] * pow(2, 8 * j)
 			if aReadTimers[i] or aUpdateResetTimers[i]:
 				dataCountTimer += 1
 			
 			if aReadCounters[i]:
 				for j in range(4):
-					aCounterValues[i] += recDataBuff[j + numTimers * 4 + dataCountCounter * 4] * pow(2, 8 * j)
+					aCounterValues[i] += recBuff[j + numTimers * 4 + dataCountCounter * 4] * pow(2, 8 * j)
 			if aReadCounters[i] or aResetCounters[i]:
 				dataCountCounter += 1
 		
