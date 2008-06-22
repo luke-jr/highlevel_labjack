@@ -1214,7 +1214,7 @@ class U3(_common):
 				0,            # outDataSize
 			)
 	
-	def eTCValues(self, aReadTimers, aUpdateResetTimers, aReadCounters, aResetCounters):
+	def eTCValues(self, aReadTimers, aUpdateResetTimers, aTimerValues, aReadCounters, aResetCounters):
 		sendBuff = [0] * 12
 		recBuff  = [0] * 16
 		
