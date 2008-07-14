@@ -36,6 +36,9 @@ class _common:
 		self._LJP = LabJackPython()
 		self._LJ  = self._LJP.OpenLabJack(self._type, ConnectionType, Address, FF)
 	
+	def __del__(self):
+		self.close()
+	
 	def close(self):
 		self._LJP.CloseDevice(self._LJ)
 	
