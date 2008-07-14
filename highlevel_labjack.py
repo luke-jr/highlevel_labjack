@@ -16,6 +16,8 @@ class CalibrationInfo:
 
 class _common:
 	caliInfo = None
+	_LJP = None
+	_LJ = None
 	
 	def __init__(self, ConnectionType, Address, FirstFound = True):
 		self.reinit(ConnectionType, Address, FirstFound)
@@ -29,17 +31,22 @@ class _common:
 		self.Address = Address
 		self.FirstFound = FirstFound
 		
+		self.reopen()
+	
+	def reopen(self):
+		self.close()
+		if self._LJP is None:
+			self._LJP = LabJackPython()
 		FF = 0
-		if FirstFound:
+		if self.FirstFound:
 			FF = 1
-		
-		self._LJP = LabJackPython()
-		self._LJ  = self._LJP.OpenLabJack(self._type, ConnectionType, Address, FF)
+		self._LJ  = self._LJP.OpenLabJack(self._type, self.ConnectionType, self.Address, FF)
 	
 	def __del__(self):
 		self.close()
 	
 	def close(self):
+	  if not (self._LJP is None or self._LJ is None):
 		self._LJP.CloseDevice(self._LJ)
 	
 	def normalChecksum(self, b):
