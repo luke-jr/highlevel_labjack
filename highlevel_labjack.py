@@ -1,6 +1,7 @@
 from LabJackPython import LabJackPython, LabJackException
 import os
 from socket import socket, SOL_SOCKET, SO_RCVBUF
+import threading
 from time import time
 if os.name == 'nt':
 	import win32api
@@ -14,12 +15,24 @@ class CalibrationInfo:
 		self.hvAINSlope     = [0] * 4
 		self.hvAINOffset    = [0] * 4
 
+class _nothreadsafe:
+	def acquire():
+		pass
+	def release():
+		pass
+
 class _common:
 	caliInfo = None
 	_LJP = None
 	_LJ = None
 	
-	def __init__(self, ConnectionType, Address, FirstFound = True):
+	def __init__(self, ConnectionType, Address, FirstFound = True, ThreadSafe = True):
+		if ThreadSafe:
+			self._tlock = threading.Lock()
+		else:
+			self._tlock = _nothreadsafe()
+			self.reopen = self._real_reopen
+			self.close = self._real_close
 		self.reinit(ConnectionType, Address, FirstFound)
 	
 	def reinit(self, ConnectionType = None, Address = None, FirstFound = None):
@@ -33,21 +46,33 @@ class _common:
 		
 		self.reopen()
 	
-	def reopen(self):
-		self.close()
+	def _real_reopen(self):
+		self._real_close()
 		if self._LJP is None:
 			self._LJP = LabJackPython()
 		FF = 0
 		if self.FirstFound:
 			FF = 1
 		self._LJ  = self._LJP.OpenLabJack(self._type, self.ConnectionType, self.Address, FF)
+	def reopen(self):
+		self._tlock.acquire()
+		try:
+			self._real_reopen()
+		finally:
+			self._tlock.release()
 	
 	def __del__(self):
 		self.close()
 	
-	def close(self):
+	def _real_close(self):
 	  if not (self._LJP is None or self._LJ is None):
 		self._LJP.CloseDevice(self._LJ)
+	def close(self):
+		self._tlock.acquire()
+		try:
+			self._real_close()
+		finally:
+			self._tlock.release()
 	
 	def normalChecksum(self, b):
 		b[0] = self.normalChecksum8(b)
@@ -286,11 +311,15 @@ class _common:
 		
 		extendedChecksum(sendBuff, sendSize)
 		
-		# Sending command to UE9
-		self._LJP.Write(self._LJ, sendBuff, sendSize)
-		
-		# Reading response from UE9
-		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+		self._tlock.acquire()
+		try:
+			# Sending command to UE9
+			self._LJP.Write(self._LJ, sendBuff, sendSize)
+			
+			# Reading response from UE9
+			(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+		finally:
+			self._tlock.release()
 		if recChars < recSize:
 			if recChars == 0:
 				raise LabJackException(0, "I2C Error : read failed")
@@ -362,9 +391,13 @@ class UE9(_common):
 			sendBuffer[7] = idx
 			LabJackPython.SetChecksum(sendBuffer)
 			
-			self._LJP.Write(self._LJ, sendBuffer, 8)
-			
-			(sentRec, recBuffer) = self._LJP.Read(self._LJ, False, 136)
+			self._tlock.acquire()
+			try:
+				self._LJP.Write(self._LJ, sendBuffer, 8)
+				
+				(sentRec, recBuffer) = self._LJP.Read(self._LJ, False, 136)
+			finally:
+				self._tlock.release()
 			
 			if sentRec < 136:
 				raise LabJackException(0, "getCalibrationInfo recv did not receive all of the buffer")
@@ -571,11 +604,15 @@ class UE9(_common):
 		
 		self.extendedChecksum(sendBuff)
 		
-		# Sending command to UE9
-		self._LJP.Write(self._LJ, sendBuff, 34)
-		
-		# Reading response from UE9
-		(recChars, recBuff) = self._LJP.Read(self._LJ, False, 64);
+		self._tlock.acquire()
+		try:
+			# Sending command to UE9
+			self._LJP.Write(self._LJ, sendBuff, 34)
+			
+			# Reading response from UE9
+			(recChars, recBuff) = self._LJP.Read(self._LJ, False, 64);
+		finally:
+			self._tlock.release()
 		if recChars == 0:
 			raise LabJackException(0, "DIO Feedback error : read failed")
 		if recChars < 64:
@@ -656,12 +693,16 @@ class UE9(_common):
 		sendBuff[7] = 0                # Reserved
 		sendBuff[0] = reduce(lambda x,y:x+y, sendBuff[1:]) & 0xff
 		
-		# Sending command to UE9
-		self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
-		
-		# Reading response from UE9
-		recSize = 8
-		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+		self._tlock.acquire()
+		try:
+			# Sending command to UE9
+			self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
+			
+			# Reading response from UE9
+			recSize = 8
+			(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+		finally:
+			self._tlock.release()
 		if recChars < recSize:
 			if recChars == 0:
 				raise LabJackException(0, "Read failed");
@@ -705,11 +746,15 @@ class UE9(_common):
 		
 		extendedChecksum(sendBuff)
 		
-		# Sending command to UE9
-		self._LJP.Write(self._LJ, sendBuff, 30)
-		
-		# Reading response from UE9
-		(recChars, recBuff) = self._LJP.Read(self._LJ, False, 40)
+		self._tlock.acquire()
+		try:
+			# Sending command to UE9
+			self._LJP.Write(self._LJ, sendBuff, 30)
+			
+			# Reading response from UE9
+			(recChars, recBuff) = self._LJP.Read(self._LJ, False, 40)
+		finally:
+			self._tlock.release()
 		if recChars == 0:
 			raise LabJackException(0, "ehTimerCounter error : read failed")
 		if recChars < 40:
@@ -771,9 +816,13 @@ class U3(_common):
 		
 		self.extendedChecksum(cU3SendBuffer)
 		
-		self._LJP.Write(self._LJ, cU3SendBuffer, 26)
-		
-		(sentRec, cU3RecBuffer) = self._LJP.Read(self._LJ, False, 38)
+		self._tlock.acquire()
+		try:
+			self._LJP.Write(self._LJ, cU3SendBuffer, 26)
+			
+			(sentRec, cU3RecBuffer) = self._LJP.Read(self._LJ, False, 38)
+		finally:
+			self._tlock.release()
 		if sentRec < 38:
 			raise LabJackException(0, "getCalibrationInfo recv did not receive all of the buffer")
 		
@@ -796,9 +845,13 @@ class U3(_common):
 			sendBuffer[7] = idx
 			LabJackPython.SetChecksum(sendBuffer)
 			
-			self._LJP.Write(self._LJ, sendBuffer, 8)
-			
-			(sentRec, recBuffer) = self._LJP.Read(self._LJ, False, 40)
+			self._tlock.acquire()
+			try:
+				self._LJP.Write(self._LJ, sendBuffer, 8)
+				
+				(sentRec, recBuffer) = self._LJP.Read(self._LJ, False, 40)
+			finally:
+				self._tlock.release()
 			
 			if sentRec < 40:
 				raise LabJackException(0, "getCalibrationInfo recv did not receive all of the buffer")
@@ -1299,12 +1352,16 @@ class U3(_common):
 		sendBuff[11]= inEIOAnalog      # EIOAnalog
 		self.extendedChecksum(sendBuff)
 		
-		# Sending command to U3
-		self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
-		
-		# Reading response from U3
-		recSize = 12
-		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+		self._tlock.acquire()
+		try:
+			# Sending command to U3
+			self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
+			
+			# Reading response from U3
+			recSize = 12
+			(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+		finally:
+			self._tlock.release()
 		if recChars < recSize:
 			if recChars == 0:
 				raise LabJackException(0, "Read failed");
@@ -1339,11 +1396,15 @@ class U3(_common):
 		sendBuff[9] = inTimerClockDivisor  # TimerClockDivisor
 		self.extendedChecksum(sendBuff)
 		
-		# Sending command to U3
-		self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
-		
-		# Reading response from U3
-		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+		self._tlock.acquire()
+		try:
+			# Sending command to U3
+			self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
+			
+			# Reading response from U3
+			(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+		finally:
+			self._tlock.release()
 		if recChars < recSize:
 			if recChars == 0:
 				raise LabJackException(0, "ehConfigTimerClock : read failed")
@@ -1391,11 +1452,15 @@ class U3(_common):
 		
 		self.extendedChecksum(sendBuff)
 		
-		# Sending command to U3
-		self._LJP.Write(self._LJ, sendBuff, sendSize)
-		
-		# Reading response from U3
-		(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+		self._tlock.acquire()
+		try:
+			# Sending command to U3
+			self._LJP.Write(self._LJ, sendBuff, sendSize)
+			
+			# Reading response from U3
+			(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+		finally:
+			self._tlock.release()
 		if recChars < recSize:
 			if recChars == 0:
 				raise LabJackException(0, "ehFeedback : read failed")
