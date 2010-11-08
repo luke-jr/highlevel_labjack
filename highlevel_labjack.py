@@ -1,10 +1,25 @@
-from LabJackPython import LabJackPython, LabJackException
+# -*- coding: utf-8 -*-
+import LabJackPython
 import os
 from socket import socket, SOL_SOCKET, SO_RCVBUF
 import threading
 from time import time
 if os.name == 'nt':
 	import win32api
+
+if hasattr(LabJackPython, 'LABJACKPYTHON_VERSION'):
+	_LJP1 = LabJackPython
+	try:
+		import LJP0 as _LJP0
+		_LJP0e = _LJP0.LabJackException
+		_LJP0 = _LJP0.LabJackPython
+	except ImportError:
+		pass
+else:
+	_LJP1 = None
+	_LJP0 = LabJackPython.LabJackPython
+	_LJP0e = LabJackPython.LabJackException
+	LabJackPython = _LJP0
 
 class CalibrationInfo:
 	def __init__(self):
@@ -46,14 +61,41 @@ class _common:
 		
 		self.reopen()
 	
-	def _real_reopen(self):
-		self._real_close()
-		if self._LJP is None:
-			self._LJP = LabJackPython()
+	def _real_reopen_0(self):
+		self._LJP = _LJP0()
 		FF = 0
 		if self.FirstFound:
 			FF = 1
 		self._LJ  = self._LJP.OpenLabJack(self._type, self.ConnectionType, self.Address, FF)
+		self._LJe = _LJP0e
+		self._LJPAPI = 0
+		self._LJWrite = self._LJWrite0
+		self._LJRead  = self._LJRead0
+		self._LJSetChecksum  = self._LJSetChecksum_0
+		self._LJSetChecksum8  = self._LJSetChecksum8_0
+	def _real_reopen_1(self):
+		self._LJP = _LJP1
+		self._LJ = self._LJP.openLabJack(self._type, self.ConnectionType, firstFound=self.FirstFound, pAddress=self.Address, handleOnly=True)
+		self._LJe = _LJP1.LabJackException
+		self._LJPAPI = 1
+		self._LJWrite = self._LJWrite1
+		self._LJRead  = self._LJRead1
+		self._LJSetChecksum  = self._LJSetChecksum_1
+		self._LJSetChecksum8  = self._LJSetChecksum8_1
+	def _real_reopen(self):
+		self._real_close()
+		if _LJP1 is None:
+			return self._real_reopen_0()
+		elif _LJP0 is None:
+			return self._real_reopen_1()
+		try:
+			return self._real_reopen_1()
+		except Exception, e:
+			try:
+				return self._real_reopen_0()
+			except:
+				raise e
+			  
 	def reopen(self):
 		self._tlock.acquire()
 		try:
@@ -66,13 +108,34 @@ class _common:
 	
 	def _real_close(self):
 	  if not (self._LJP is None or self._LJ is None):
+	    if self._LJPAPI == 0:
 		self._LJP.CloseDevice(self._LJ)
+	    else:
+		self._LJ.close()
 	def close(self):
 		self._tlock.acquire()
 		try:
 			self._real_close()
 		finally:
 			self._tlock.release()
+	
+	def _LJWrite0(self, sendBuff, sendSize):
+		return self._LJP.Write(self._LJ, sendBuff, sendSize)
+	def _LJWrite1(self, sendBuff, sendSize):
+		return self._LJ.write(sendBuff)
+	def _LJRead0(self, recSize):
+		return self._LJP.Read(self._LJ, False, recSize)
+	def _LJRead1(self, recSize):
+		data = self._LJ.read(recSize, False, False)
+		return (len(data), data)
+	def _LJSetChecksum_0(self, sendBuffer):
+		return self._LJP.SetChecksum(sendBuffer)
+	def _LJSetChecksum_1(self, sendBuffer):
+		return self._LJP.setChecksum(sendBuffer)
+	def _LJSetChecksum8_0(self, recBuff, recSize):
+		return self._LJP.SetChecksum8(recBuff, recSize)
+	def _LJSetChecksum8_1(self, recBuff, recSize):
+		return self._LJP.setChecksum8(recBuff, recSize)
 	
 	def normalChecksum(self, b):
 		b[0] = self.normalChecksum8(b)
@@ -188,7 +251,7 @@ class _common:
 	def isLJTDACCalibrationInfoValid(self, caliInfo):
 		try:
 			return isCalibrationInfoValid(caliInfo)
-		except LabJackException:
+		except self._LJe:
 			raise LabJackException(0, "Invalid LJTDAC calibration info.")
 	
 	def analogToCalibratedBinaryVoltage(self, caliInfo, DACNumber, analogVoltage, safetyRange = True):
@@ -314,10 +377,10 @@ class _common:
 		self._tlock.acquire()
 		try:
 			# Sending command to UE9
-			self._LJP.Write(self._LJ, sendBuff, sendSize)
+			self._LJWrite(sendBuff, sendSize)
 			
 			# Reading response from UE9
-			(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+			(recChars, recBuff) = self._LJRead(recSize)
 		finally:
 			self._tlock.release()
 		if recChars < recSize:
@@ -389,13 +452,13 @@ class UE9(_common):
 		# reading blocks from memory
 		for idx in range(6):
 			sendBuffer[7] = idx
-			LabJackPython.SetChecksum(sendBuffer)
+			self._LJSetChecksum(sendBuffer)
 			
 			self._tlock.acquire()
 			try:
-				self._LJP.Write(self._LJ, sendBuffer, 8)
+				self._LJWrite(sendBuffer, 8)
 				
-				(sentRec, recBuffer) = self._LJP.Read(self._LJ, False, 136)
+				(sentRec, recBuffer) = self._LJRead(136)
 			finally:
 				self._tlock.release()
 			
@@ -533,7 +596,7 @@ class UE9(_common):
 		try:
 			self.isCalibrationInfoValid(caliInfo)
 			infoValid = True
-		except LabJackException:
+		except self._LJe:
 			infoValid = False
 		
 		if not infoValid:
@@ -549,7 +612,7 @@ class UE9(_common):
 		try:
 			self.isCalibrationInfoValid(caliInfo)
 			infoValid = True
-		except LabJackException:
+		except self._LJe:
 			infoValid = False
 		
 		if not infoValid:
@@ -607,10 +670,10 @@ class UE9(_common):
 		self._tlock.acquire()
 		try:
 			# Sending command to UE9
-			self._LJP.Write(self._LJ, sendBuff, 34)
+			self._LJWrite(sendBuff, 34)
 			
 			# Reading response from UE9
-			(recChars, recBuff) = self._LJP.Read(self._LJ, False, 64);
+			(recChars, recBuff) = self._LJRead(64)
 		finally:
 			self._tlock.release()
 		if recChars == 0:
@@ -696,11 +759,11 @@ class UE9(_common):
 		self._tlock.acquire()
 		try:
 			# Sending command to UE9
-			self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
+			self._LJWrite(sendBuff, len(sendBuff))
 			
 			# Reading response from UE9
 			recSize = 8
-			(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+			(recChars, recBuff) = self._LJRead(recSize)
 		finally:
 			self._tlock.release()
 		if recChars < recSize:
@@ -709,7 +772,7 @@ class UE9(_common):
 			else:
 				raise LabJackException(0, "Only read %d of %d bytes" % (recChars, recSize))
 		chksum = recBuff[0]
-		self._LJP.SetChecksum8(recBuff, recSize)
+		self._LJSetChecksum8(recBuff, recSize)
 		if chksum != recBuff[0]:
 			raise LabJackException(0, "Read buffer has bad checksum")
 		if recBuff[1] != 0xA3:
@@ -749,10 +812,10 @@ class UE9(_common):
 		self._tlock.acquire()
 		try:
 			# Sending command to UE9
-			self._LJP.Write(self._LJ, sendBuff, 30)
+			self._LJWrite(sendBuff, 30)
 			
 			# Reading response from UE9
-			(recChars, recBuff) = self._LJP.Read(self._LJ, False, 40)
+			(recChars, recBuff) = self._LJRead(40)
 		finally:
 			self._tlock.release()
 		if recChars == 0:
@@ -818,9 +881,9 @@ class U3(_common):
 		
 		self._tlock.acquire()
 		try:
-			self._LJP.Write(self._LJ, cU3SendBuffer, 26)
+			self._LJWrite(cU3SendBuffer, 26)
 			
-			(sentRec, cU3RecBuffer) = self._LJP.Read(self._LJ, False, 38)
+			(sentRec, cU3RecBuffer) = self._LJRead(38)
 		finally:
 			self._tlock.release()
 		if sentRec < 38:
@@ -843,13 +906,13 @@ class U3(_common):
 		# reading blocks from memory
 		for idx in range(6):
 			sendBuffer[7] = idx
-			LabJackPython.SetChecksum(sendBuffer)
+			self._LJSetChecksum(sendBuffer)
 			
 			self._tlock.acquire()
 			try:
-				self._LJP.Write(self._LJ, sendBuffer, 8)
+				self._LJWrite(sendBuffer, 8)
 				
-				(sentRec, recBuffer) = self._LJP.Read(self._LJ, False, 40)
+				(sentRec, recBuffer) = self._LJRead(40)
 			finally:
 				self._tlock.release()
 			
@@ -1355,11 +1418,11 @@ class U3(_common):
 		self._tlock.acquire()
 		try:
 			# Sending command to U3
-			self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
+			self._LJWrite(sendBuff, len(sendBuff))
 			
 			# Reading response from U3
 			recSize = 12
-			(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+			(recChars, recBuff) = self._LJRead(recSize)
 		finally:
 			self._tlock.release()
 		if recChars < recSize:
@@ -1399,10 +1462,10 @@ class U3(_common):
 		self._tlock.acquire()
 		try:
 			# Sending command to U3
-			self._LJP.Write(self._LJ, sendBuff, len(sendBuff))
+			self._LJWrite(sendBuff, len(sendBuff))
 			
 			# Reading response from U3
-			(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+			(recChars, recBuff) = self._LJRead(recSize)
 		finally:
 			self._tlock.release()
 		if recChars < recSize:
@@ -1455,10 +1518,10 @@ class U3(_common):
 		self._tlock.acquire()
 		try:
 			# Sending command to U3
-			self._LJP.Write(self._LJ, sendBuff, sendSize)
+			self._LJWrite(sendBuff, sendSize)
 			
 			# Reading response from U3
-			(recChars, recBuff) = self._LJP.Read(self._LJ, False, recSize);
+			(recChars, recBuff) = self._LJRead(recSize)
 		finally:
 			self._tlock.release()
 		if recChars < recSize:
