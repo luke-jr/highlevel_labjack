@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import LabJackPython
+LabJackException = LabJackPython.LabJackException
 import os
 from socket import socket, SOL_SOCKET, SO_RCVBUF
 import threading
