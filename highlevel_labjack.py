@@ -32,9 +32,9 @@ class CalibrationInfo:
 		self.hvAINOffset    = [0] * 4
 
 class _nothreadsafe:
-	def acquire():
+	def acquire(self):
 		pass
-	def release():
+	def release(self):
 		pass
 
 class _common:
