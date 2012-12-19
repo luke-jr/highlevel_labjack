@@ -42,7 +42,8 @@ class _common:
 	_LJP = None
 	_LJ = None
 	
-	def __init__(self, ConnectionType, Address, FirstFound = True, ThreadSafe = True):
+	def __init__(self, ConnectionType, Address, FirstFound = True, ThreadSafe = True, ForceLJP = None):
+		self._force_LJP = ForceLJP
 		if ThreadSafe:
 			self._tlock = threading.Lock()
 		else:
@@ -85,6 +86,8 @@ class _common:
 		self._LJSetChecksum8  = self._LJSetChecksum8_1
 	def _real_reopen(self):
 		self._real_close()
+		if self._force_LJP:
+			return getattr(self, '_real_reopen_%d' % (self._force_LJP,))()
 		if _LJP1 is None:
 			return self._real_reopen_0()
 		elif _LJP0 is None:
