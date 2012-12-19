@@ -649,8 +649,13 @@ class UE9(_common):
 		sendBuff[2] = 0x0E  # number of data words
 		sendBuff[3] = 0x00  # extended command number
 		
-		tempOffset = 6 + ((channel / 8) * 3)
-		tempByte = pow(2, channel % 8)
+		if channel <= 19:
+			tempOffset = 6 + ((channel / 8) * 3)
+			tempByte = pow(2, channel % 8)
+		else:
+			tempOffset = 14
+			tempByte = pow(2, channel - 20)
+		
 		sendBuff[tempOffset] = tempByte
 		rvidx = {
 			 6:  7,
